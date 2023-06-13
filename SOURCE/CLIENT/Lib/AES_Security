@@ -1,0 +1,18 @@
+local module = {}
+
+function module:Auth()
+    local RealAuth = function()
+        -- checks here
+
+        return 'Auth_Passed_true'
+    end
+
+    return RealAuth
+end
+
+function module:GetKey(Values)
+    if typeof(Values) ~= 'table' then return end 
+
+end
+
+return module
