@@ -351,9 +351,8 @@ end
 local random = Random.new(tick())
 -- Function to generate a 256-bit AES key
 local function Generate256BitAESKey()
-	local Num1 = math.random(1,128)
-	local Num2 = math.random(Num1,Num1 + 128)
-	return random:NextInteger(2^Num1 * -1,2^Num2)
+	local random = Random.new(tick())
+	return random:NextInteger(2^52 * -1,2^52) * random:NextInteger(1,1000000000000)
 end
 local function ConvertAESKeyFromString(keyString)
 	local key = {}
@@ -390,8 +389,8 @@ local function MainEncrypt(ToBeEncrypted,key)
 		end
 		if IsDict then
 			for i,v in pairs(ToBeEncrypted) do 
-				local Index = MainEncrypt(i,key)
-				local value = MainEncrypt(v,key)
+				local Index = MainEncrypt(tostring(i),key)
+				local value = MainEncrypt(tostring(v),key)
 				NewTable[Index] = value
 			end
 		end
@@ -399,21 +398,26 @@ local function MainEncrypt(ToBeEncrypted,key)
 	end
 end
 local Sec = require(game.ReplicatedStorage.Pulse.Lib.AES_Security)
-function module.new(Message,EncryptType)
-
-	local key = 0x68C756C6C186436C9EC51C174C32AE81761389B5E5904E30BA57CCD911290ECC
+function module.new(Message,EncryptType,key)
+	if not key then
+		key = Generate256BitAESKey()
+	end
 	if EncryptType == 'Encrypt' then
+		warn(typeof(Message))
 		if typeof(Message) == 'string' or typeof(Message) == 'number' then
 			local Encrypted = ECB_256(encrypt,key,Message)
-			Sec:StoreKey(Encrypted)
-			--return Encrypted
+			warn('a')
+			return Sec:StoreKey(Encrypted),key
 		elseif typeof(Message) == 'table' then
 			local EncryptedMessage = {}
 			local IsDictionary = true
 			for i,v in ipairs(Message) do 
 				IsDictionary = false
-				local EncryptedIndex = ECB_256(encrypt,key,i)
+				local EncryptedIndex = ECB_256(encrypt,key,tostring(i))
+				local EncryptedValue = ECB_256(encrypt,key,tostring(v))
+				EncryptedMessage[EncryptedIndex] = EncryptedValue
 			end
+			return Sec:StoreKey(EncryptedMessage),key
 		end
 	elseif EncryptType == 'Decrypt' then
 		return nil

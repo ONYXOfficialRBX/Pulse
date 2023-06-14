@@ -17,38 +17,52 @@ function module:EncodeMessage(Message,Player)
 		Player = game.Players.LocalPlayer
 	end
 	local Number = random:NextInteger(2^32 * -1,2^32)
-	local NewMsg = string.split(Message,'')
 	local ReturnValue = {}
-	for i,v in ipairs(NewMsg) do 
-		local AddValue = {}
-		local Base = string.byte(v)
-		local One = Base * Number
-		local Two = One + Player.AccountAge
-		local Last = Two - Player.UserId
-		table.insert(ReturnValue,Last)
+	if typeof(Message) == 'string' then
+		local NewMsg = string.split(Message,'')
+		for i,v in ipairs(NewMsg) do 
+			local AddValue = {}
+			local Base = string.byte(v)
+			local One = Base * Number
+			local Two = One + Player.AccountAge
+			local Last = Two - Player.UserId
+			table.insert(ReturnValue,Last)
 
-	end 
+		end 
+	elseif typeof(Message) == 'table' then
+		for i,v in pairs(Message) do 
+			local NewEntry = {}
+			NewEntry[module:EncodeMessage(i)] = module:EncodeMessage(v)
+			table.insert(ReturnValue,NewEntry)
+		end
+
+	end
 	return ReturnValue,Number,StartTime
 end
 
 function module:DecodeMessage(EncryptedMessage,Number,Player)
-	
+
 	if not Player then
 		Player = game.Players.LocalPlayer
 	end
+
 	local DecryptMessage = ''
-	for i,v in ipairs(EncryptedMessage) do 
-		for i = 1, 300 do 
-			local base = i 
-			local one = base * Number
-			local two = one + Player.AccountAge
-			local three = two - Player.UserId
-			local suc,err = pcall(function()
-				if three == v then	
-					DecryptMessage = DecryptMessage .. string.char(base)-- THIS IS THE ENCRYPTEDCHAR
-				end
-			end)
+	if typeof(EncryptedMessage) == 'table' then
+		for i,v in ipairs(EncryptedMessage) do 
+			for i = 1, 300 do 
+				local base = i 
+				local one = base * Number
+				local two = one + Player.AccountAge
+				local three = two - Player.UserId
+				local suc,err = pcall(function()
+					if three == v then	
+						DecryptMessage = DecryptMessage .. string.char(base)-- THIS IS THE ENCRYPTEDCHAR
+					end
+				end)
+			end
 		end
+
+
 	end
 	return DecryptMessage
 end
@@ -57,16 +71,17 @@ local debounce = {}
 local Times = {}
 local Locked = false
 game:GetService('RunService').RenderStepped:Connect(function()
-    local Amount = 0 
-    for i,v in pairs(debounce) do 
-        Amount = Amount + 1
-    end
-    if Amount ~= SomeBackupTable then 
-        Locked = true 
-    end
+	local Amount = 0 
+	for i,v in pairs(debounce) do 
+		Amount = Amount + 1
+	end
+	if Amount ~= SomeBackupTable then 
+		Locked = true 
+	end
 end)
-function module:StoreKey(Values)
-    if Locked then return end
+function module:StoreKey(Values,Player)
+	--warn(Locked)
+	--if Locked then return end
 	local function EncodeMessage(Message,Player,Mainval)
 		local StartTime = tick()
 		local random = Random.new(StartTime)
@@ -93,27 +108,26 @@ function module:StoreKey(Values)
 	local Num = math.random(1,100)
 	local NewStartTime = StartTime / Num
 	local TheMainNumber = SomeNum / Num*game.Players.LocalPlayer.AccountAge
-    local MainValues = {EncryptedMessage,NewStartTime,TheMainNumber}
-    
+	local MainValues = {EncryptedMessage,NewStartTime,TheMainNumber}
+	return MainValues
 end
 
 function module:GetKey(Values)
-    if Locked then return end
+	if Locked then return end
 	if debounce[Values] then return end
 	if typeof(Values) ~= 'table' then return end 
-    debounce[Values] = true
+	debounce[Values] = true
 	local EncodedMessage = Values[1]
 	math.randomseed(game.Players.LocalPlayer.AccountAge)
-	local Num = math.random(1,100)
-	local StartTime = Values[2] * Num
-	local MainNumber = Values[3] * Num/game.Players.LocalPlayer.AccountAge
+	local StartTime = Values[2]
+	local MainNumber = Values[3]
 	local function DecodeMessage(EncryptedMessage,Number,Player)
 		if not Player then
 			Player = game.Players.LocalPlayer
 		end
 		local DecryptMessage = ''
 		for i,v in ipairs(EncryptedMessage) do 
-			for i = 1, 300 do 
+			for i = 1, 1000 do 
 				local base = i 
 				local one = base * Number
 				local two = one + Player.AccountAge
@@ -128,7 +142,7 @@ function module:GetKey(Values)
 		return DecryptMessage
 	end
 	local RawMessage = DecodeMessage(EncodedMessage,MainNumber,game.Players.LocalPlayer)
-	
+	return RawMessage
 end
 
 return module

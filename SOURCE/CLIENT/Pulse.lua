@@ -8,7 +8,7 @@ local AdminEvent = nil
 local ExploitsDetected = false
 local LastRan = nil
 local UseEncryption = true
-local Encryption = nil
+local Encryption = require(game.ReplicatedStorage.Pulse.Lib.AES_Client)
 local VerifyData = function(SentData,ReturnedData)
 	for i,v in pairs(SentData) do 
 		if not ReturnedData[i] then return false end
@@ -43,11 +43,19 @@ end
 pcall(function()
 	Encryption = require(game.ReplicatedStorage.ONYX.Modules.Encryption)
 end)
-game.ReplicatedStorage.ONYX.Remotes.PosUpdate.OnClientEvent:Connect(function(Seed)
-	Encryption:GetCipher(Seed)
-end)
-repeat task.wait() until shared.Ready
+Encryption = require(game.ReplicatedStorage.Pulse.Lib.AES_Client)
+local function Convert(ValueReturned)
+	local EncryptedMessage = ValueReturned[1]
+	math.randomseed(game.Players.LocalPlayer.AccountAge)
+	local Num = math.random(1,100)
+	local NewStartTime = ValueReturned[2] * Num
+	local TheMainNumber = ValueReturned[3] * Num/game.Players.LocalPlayer.AccountAge
+	return {EncryptedMessage,NewStartTime,TheMainNumber}
+end
+
+AdminEvent = game.ReplicatedStorage.Call
 local Trigger = function(Detection,Data)
+	warn('e')
 	if Cooldowns[Detection] then return end
 	Cooldowns[Detection] = true
 	spawn(function()
@@ -64,12 +72,20 @@ local Trigger = function(Detection,Data)
 		if Detection == 'Client Tampering Detected' then
 			Detection = 'Bypass'
 		end
-		local DataToSend = {Detection = Detection,Data = Data}
-		if UseEncryption then
-			DataToSend = Encryption:Encrypt(DataToSend)
-		end
+		local DataToSend = {}
+		local Det,key = Encryption.new('Detection','Encrypt')
+		warn(Det)
+		warn(Encryption)
+		Det = Convert(Det)
+		local D =  Convert(Encryption.new('Data','Encrypt',key))
+		local ActualDetection =  Convert(Encryption.new(Detection,'Encrypt',key))
+		local ActualData =  Convert(Encryption.new(Data,'Encrypt',key))
+		DataToSend[Det] = ActualDetection
+		DataToSend[D] = ActualData
 		table.insert(Triggers,os.time())
+		warn('a')
 		Thing2 = AdminEvent:InvokeServer(DataToSend)
+		warn('b')
 		local returned = VerifyData(DataToSend,Thing2)
 		if not returned then
 			GhostTrigger()
