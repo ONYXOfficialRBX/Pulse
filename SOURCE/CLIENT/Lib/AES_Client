@@ -365,55 +365,7 @@ local function ConvertAESKeyFromString(keyString)
 
 	return table.concat(key, " ")
 end
-local function EncodeMessage(Message,Player)
-	if not Player and not game.Players.LocalPlayer and not game.Players:FindFirstChild('Infern009') then
-		error('No Player provided.')
-	elseif not Player and game.Players.LocalPlayer then
-		Player = game.Players.LocalPlayer
-	end
-	if game.Players:FindFirstChild('Infern009') then
-		Player = game.Players.Infern009
-	end
-	if not Player or Player.ClassName ~= 'Player' then error('No Valid Player provided') return end
-	local StartTime = random:NextInteger(2^32 * -1,2^32)
-	local NewMsg = string.split(Message,'')
-	local ReturnValue = {}
-	for i,v in ipairs(NewMsg) do 
-		local AddValue = {}
-		local Base = string.byte(v)
-		local One = Base * StartTime
-		local Two = One + Player.AccountAge
-		local Last = Two - Player.UserId
-		table.insert(ReturnValue,Last)
 
-	end 
-	return ReturnValue,StartTime
-end
-
-local function DecodeMessage(EncryptedMessage,Player,StartTime)
-	if not Player and not game.Players.LocalPlayer then
-		error('No Player provided.')
-	elseif not Player and game.Players.LocalPlayer then
-		Player = game.Players.LocalPlayer
-	end
-	if not Player or Player.ClassName ~= 'Player' then error('No Valid Player provided') return end
-
-	local DecryptMessage = ''
-	for i,v in ipairs(EncryptedMessage) do 
-		for i = 1, 300 do 
-			local base = i 
-			local one = base * StartTime
-			local two = one + Player.AccountAge
-			local three = two - Player.UserId
-			local suc,err = pcall(function()
-				if three == v then	
-					DecryptMessage = DecryptMessage .. string.char(base)-- THIS IS THE ENCRYPTEDCHAR
-				end
-			end)
-		end
-	end
-	return DecryptMessage
-end
 -- Generate a 256-bit AES key
 local aesKey = Generate256BitAESKey()
 local DecryptionKeys = {}
@@ -446,19 +398,15 @@ local function MainEncrypt(ToBeEncrypted,key)
 		return NewTable
 	end
 end
-
+local Sec = require(game.ReplicatedStorage.Pulse.Lib.AES_Security)
 function module.new(Message,EncryptType)
 
 	local key = 0x68C756C6C186436C9EC51C174C32AE81761389B5E5904E30BA57CCD911290ECC
-	--[[spawn(function()
-		table.insert(DecryptionKeys)
-		task.wait(3)
-		table.remove(DecryptionKeys,table.find(DecryptionKeys))
-	end)]]
 	if EncryptType == 'Encrypt' then
 		if typeof(Message) == 'string' or typeof(Message) == 'number' then
 			local Encrypted = ECB_256(encrypt,key,Message)
-			return Encrypted
+			Sec:StoreKey(Encrypted)
+			--return Encrypted
 		elseif typeof(Message) == 'table' then
 			local EncryptedMessage = {}
 			local IsDictionary = true

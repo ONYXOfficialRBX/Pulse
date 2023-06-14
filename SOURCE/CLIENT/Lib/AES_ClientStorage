@@ -1,0 +1,5 @@
+local module = {}
+
+module.EncryptedStorage = {}
+
+return module
