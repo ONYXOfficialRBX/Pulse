@@ -451,6 +451,14 @@ local function MainDecrypt(ToBeDecrypted,key)
 	if typeof(ToBeDecrypted) == 'number' or typeof(ToBeDecrypted) == 'string' then
 		ToBeDecrypted = tostring(ToBeDecrypted)
 		local res = ECB_256(decrypt,key,ToBeDecrypted)
+		local newResult = ''
+		for i = 1, string.len(res) do 
+			local Char = string.sub(res,i,i)
+			if string.byte(Char) and string.byte(Char) ~= 0 then
+				newResult = newResult .. Char
+			end
+		end
+		res = newResult
 		res = filterDataType(res)
 		return res,key
 	elseif typeof(ToBeDecrypted) == 'table' then
