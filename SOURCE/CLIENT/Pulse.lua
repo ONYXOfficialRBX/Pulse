@@ -33,136 +33,7 @@ end
 function module:UseEncryption(boolean)
 	UseEncryption = boolean
 end
-local function EncodeMessage(Message,Seed)
 
-	local function IsValid(Chosen,Order)
-		for i,v in pairs(Order) do 
-			if v == Chosen then return false end
-		end
-		return true
-	end
-
-	local random
-	if not Seed then
-		random = Random.new(tick())
-	else
-		random = Random.new(Seed)
-	end
-	Seed = tick()
-	local BaseOrder = {}
-	local Index = 0 
-	for i = 1, 255 do 
-		Index = Index + 1
-		local Char = string.char(i)
-		if not BaseOrder[Char] then
-			local Valid = false
-			local Chosen = random:NextInteger(1,255)
-			while not Valid do 
-				if IsValid(Chosen,BaseOrder) then 
-					BaseOrder[Char] = Chosen
-					Valid = true
-				else
-					Chosen = random:NextInteger(1,255)
-				end
-			end
-		end
-	end
-	local EncodedMessage = ''
-	if typeof(Message) == 'string' then
-		for i = 1, string.len(tostring(Message)) do 
-			local Char = string.sub(Message,i,i)
-			if BaseOrder[Char] then
-				EncodedMessage = EncodedMessage .. BaseOrder[Char] .. '/'
-			end
-		end
-
-	elseif typeof(Message) == 'table' then
-		EncodedMessage = {}
-		for i,v in pairs(Message) do 
-			local NewIndex = ''
-			local NewValue = ''
-			for I = 1, string.len(tostring(i)) do 
-				local IndexChar = string.sub(i,I,I)
-				if BaseOrder[IndexChar] then
-					NewIndex = NewIndex .. BaseOrder[IndexChar] .. '/'
-				end
-			end
-			for I = 1, string.len(tostring(v)) do 
-				local ValueChar = string.sub(v,I,I)
-				if BaseOrder[ValueChar] then
-					NewValue = NewValue .. BaseOrder[ValueChar] .. '/'
-				end
-			end
-			EncodedMessage[NewIndex] = NewValue
-		end
-	end
-	BaseOrder = {123}
-	return EncodedMessage,Seed
-end
-
-local function DecodeMessage(Message,Seed)
-	local function IsValid(Chosen,Order)
-		for i,v in pairs(Order) do 
-			if i == Chosen then return false end
-		end
-		return true
-	end
-
-	local random
-	if not Seed then
-		random = Random.new(tick())
-	else
-		random = Random.new(Seed)
-	end
-	local BaseOrder = {}
-	local Index = 0 
-	for i = 1, 255 do 
-		Index = Index + 1
-		local Char = string.char(i)
-		if not BaseOrder[Char] then
-			local Valid = false
-			local Chosen = random:NextInteger(1,255)
-			while not Valid do 
-				if IsValid(Chosen,BaseOrder) then 
-					BaseOrder[Chosen] = Char
-					Valid = true
-				else
-					Chosen = random:NextInteger(1,255)
-				end
-			end
-		end
-	end
-	local DecodedMessage = ''
-	if typeof(Message) == 'string' then
-		warn(Message)
-		for i,v in ipairs(string.split(Message,'/')) do 
-			if tonumber(v) then
-				DecodedMessage = DecodedMessage .. BaseOrder[tonumber(v)]
-			end
-		end
-	elseif typeof(Message) == 'table' then
-		DecodedMessage = {}
-		for i,v in pairs(Message) do 
-			local NewIndex = ''
-			local NewValue = ''
-			for Index,Value in ipairs(string.split(i,'/')) do 
-				local Char = BaseOrder[tonumber(Value)]
-				if Char then
-					NewIndex = NewIndex .. Char
-				end
-			end
-			for Index,Value in ipairs(string.split(v,'/')) do 
-				local Char = BaseOrder[tonumber(Value)]
-				if Char then
-					NewValue = NewValue .. Char
-				end
-			end
-			DecodedMessage[NewIndex] = NewValue
-		end
-	end
-	BaseOrder = {123}
-	return DecodedMessage
-end
 local GhostTrigger = function()
 	repeat task.wait() until game.Players.LocalPlayer.Character
 	local Character = game.Players.LocalPlayer.Character
@@ -184,6 +55,7 @@ end
 AdminEvent = game.ReplicatedStorage.Pulse.Events.Call
 local Sec = require(game.ReplicatedStorage.Pulse.Lib.AES_Security)
 local Trigger = function(Detection,Data)
+	warn(Detection,Data)
 	if Cooldowns[Detection] then return end
 	Cooldowns[Detection] = true
 	spawn(function()
@@ -283,8 +155,6 @@ local Auth = function()
 			table.insert(MainTraces,Data[1])
 		end
 		local e = Data[1]
-		Data[1] = nil
-		Data = nil
 		for i = 1, string.len(e) do 
 			if not e then return end
 			if string.sub(e,i,i) == ' ' then
@@ -382,7 +252,7 @@ end
 
 local LastRuns = {}
 local MainThing = ''
-function module.new(Func,LoopDelay:number,Detection:string)
+function module.new(Func,LoopDelay,Detection)
 	if not Func then return end
 	if not LoopDelay then
 		LoopDelay = 1/60
@@ -511,41 +381,51 @@ game:GetService('RunService').RenderStepped:Connect(function()
 	if not script.Parent then
 		--Trigger('Client Tampering Detected','16')
 	end
-	local Key  = GetNextFunction()
-	local Actualkey = GetKeyFromFunction(Key)
-	if Actualkey == '' or Actualkey == ' ' then return end
-	if not Key then return end
-	if not CurrentLoops[Actualkey] and Actualkey ~= '' then
-		Trigger('Client Tampering Detected','17\n' .. 'function Removed.')
-	end
-	local lastRun = CurrentLoops[Actualkey .. 'LastRun']
-	local TheDelay = CurrentLoops[Actualkey .. 'Delay']
-	local success,err = nil
-	CurrentLoops[Actualkey .. 'LastRun'] = os.time()
-	success,err = pcall(function()
-		local Result,ExtraData = Key()
-		if not LastReturnValues[Actualkey] and Result ~= 'check_failed' then
-			LastReturnValues[Actualkey] = Result 
-		else
-			if LastReturnValues[Actualkey] ~= Result and tostring(Result) ~= 'check_failed' and LastReturnValues[Actualkey] ~= 'check_failed' then
-				Trigger('Client Tampering Detected','18\n' .. 'Expected: ' .. tostring(LastReturnValues[Actualkey]) .. ' Got: ' .. tostring(Result) .. '\nDetection: ' .. CurrentLoops[Actualkey .. 'Detection'])
+	for i,v in ipairs(string.split(MainThing,':')) do 
+		local Key = v
+		local Actualkey = Key
+		local lastRun  = CurrentLoops[Key .. 'LastRun']
+		local TheDelay = CurrentLoops[Key .. 'Delay']
+		local MainFunction = CurrentLoops[Key]
+		if not LastRan and TheDelay then
+			LastRan = 0
+		end
+		if MainFunction and LastRan and TheDelay and LastRan + TheDelay <= os.time() then
+			if Actualkey == '' or Actualkey == ' ' then return end
+			if not Key then return end
+			if not CurrentLoops[Actualkey] and Actualkey ~= '' then
+				Trigger('Client Tampering Detected','17\n' .. 'function Removed.')
+			end
+			local lastRun = CurrentLoops[Actualkey .. 'LastRun']
+			local TheDelay = CurrentLoops[Actualkey .. 'Delay']
+			local success,err = nil
+			CurrentLoops[Actualkey .. 'LastRun'] = os.time()
+			success,err = pcall(function()
+				local Result,ExtraData = MainFunction()
+				if not LastReturnValues[Actualkey] and Result ~= 'check_failed' then
+					LastReturnValues[Actualkey] = Result 
+				else
+					if LastReturnValues[Actualkey] ~= Result and tostring(Result) ~= 'check_failed' and LastReturnValues[Actualkey] ~= 'check_failed' then
+						Trigger('Client Tampering Detected','18\n' .. 'Expected: ' .. tostring(LastReturnValues[Actualkey]) .. ' Got: ' .. tostring(Result) .. '\nDetection: ' .. CurrentLoops[Actualkey .. 'Detection'])
+					end
+				end
+				if Result == 'check_failed' then
+					Trigger(CurrentLoops[Actualkey .. 'Detection'],ExtraData)
+				end
+			end)
+			if success then
+				LastRan = os.time()
+				CurrentLoops[Actualkey .. 'LastRun'] = os.time()
+			end
+			if not success then
+				warn(err)
+				--warn(CurrentLoops[tostring(Actualkey) .. 'Detection'] .. ' ran into a problem while executing, Data: ' .. tostring(err))
+			end
+			if Actualkey ~= '' and LastRan + TheDelay + 10 < TheDelay + os.time() then
+				Trigger('Client Tampering Detected','20\n function execution ceased' )
 			end
 		end
-		if Result == 'check_failed' then
-			Trigger(CurrentLoops[Actualkey .. 'Detection'],ExtraData)
-		end
-	end)
-	if success then
-		LastRan = os.time()
-		CurrentLoops[Actualkey .. 'LastRun'] = os.time()
 	end
-	if not success then
-		warn(CurrentLoops[Actualkey .. 'Detection'] .. ' ran into a problem while executing, Data: ' .. err)
-	end
-	if Actualkey ~= '' and LastRan + TheDelay + 10 < TheDelay + os.time() then
-		Trigger('Client Tampering Detected','20\n function execution ceased' )
-	end
-
 	LastRun = os.time()
 end)
 
