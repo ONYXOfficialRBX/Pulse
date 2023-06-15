@@ -42,6 +42,7 @@ function module:EncodeMessage(Message,Seed)
 		random = Random.new(Seed)
 	end
 	Seed = tick()
+	Seed = math.floor(Seed)
 	local BaseOrder = {}
 	local Index = 0 
 	for i = 0, 255 do 

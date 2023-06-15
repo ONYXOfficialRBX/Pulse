@@ -403,7 +403,6 @@ function module.new(Message,EncryptType,key)
 	if not key then
 		key = Generate256BitAESKey()
 	end
-	print(key)
 	if EncryptType == 'Encrypt' then
 		if typeof(Message) == 'string' or typeof(Message) == 'number' then
 			local Encrypted = ECB_256(encrypt,key,Message)

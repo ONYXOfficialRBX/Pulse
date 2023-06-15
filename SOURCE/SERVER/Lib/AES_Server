@@ -448,6 +448,22 @@ local function DecodeMessage(EncryptedMessage,Player,StartTime)
 	end
 	return DecryptMessage
 end
+
+local function filterDataType(Data)
+	if typeof(Data) ~= 'string' then return Data end
+	if tonumber(Data) then
+		return tonumber(Data)
+	elseif #string.split(Data,',') == 3 then
+		local Split = string.split(Data,',')
+		return Vector3.new(Split[1],Split[2],Split[3])
+	elseif #string.split(Data,',') == 12 then
+		local Split = string.split(Data,',')
+		return CFrame.new(Split[1],Split[2],Split[3],Split[4],Split[5],Split[6],Split[7],Split[8],Split[9],Split[10],Split[11],Split[12])
+	else
+		return tostring(Data)
+	end
+end
+
 -- Generate a 256-bit AES key
 local aesKey = Generate256BitAESKey()
 local DecryptionKeys = {}
@@ -466,16 +482,14 @@ local function MainDecrypt(ToBeDecrypted,key)
 		if tonumber(Val) ~= nil then
 			Val = tonumber(Val)
 		end
-		if #string.split(Val,',') == 12 then
-			-- convert to CFrame
-			local data = string.split(Val,',')
-			return CFrame.new(data[1],data[2],data[3],data[4],data[5],data[6],data[7],data[8],data[9],data[10],data[11],data[12])
+		local new = ''
+		for i = 1, string.len(Val) do
+			if string.byte(string.sub(Val,i,i)) then
+				new = new .. string.sub(Val,i,i)
+			end
 		end
-		if #string.split(Val,',') == 3 then
-			local data = string.split(Val,',')
-			-- Convert to Vector3
-			return Vector3.new(data[1],data[2],data[3])
-		end
+		Val = new
+		Val = filterDataType(Val)
 		return Val,key
 	elseif typeof(ToBeDecrypted) == 'table' then
 		local NewTable = {}
@@ -484,15 +498,37 @@ local function MainDecrypt(ToBeDecrypted,key)
 			IsDict = false
 			local Index = i
 			local Value = MainDecrypt(v,key)
+			Value = filterDataType(Value)
 			NewTable[Index] = Value
 		end
 		if IsDict then
 			for i,v in pairs(ToBeDecrypted) do 
-				local Index = MainDecrypt(i,key)
-				local value = MainDecrypt(v,key)
+				local Index = MainDecrypt(tostring(i),key)
+				local value = MainDecrypt(tostring(v),key)
+				Index = filterDataType(Index)
+				value = filterDataType(value)
 				NewTable[Index] = value
 			end
 		end
+		--[[local newReturn = {}
+		for index,value in pairs(NewTable) do 
+			local newIndex = ''
+			local newValue = ''
+			for i = 1, string.len(index) do 
+				local Char = string.sub(index,i,i)
+				if string.byte(Char) ~= 0 and string.byte(Char) then
+					newIndex = newIndex .. Char					
+				end
+			end
+			for i = 1, string.len(tostring(value)) do 
+				local Char = string.sub(value,i,i)
+				if string.byte(Char) ~= 0 and string.byte(Char) then
+					newValue = newValue .. Char
+				end
+			end
+			newReturn[newIndex] = newValue
+		end
+		NewTable = newReturn]]
 		return NewTable
 	end
 end
@@ -504,7 +540,8 @@ local function MainEncrypt(ToBeEncrypted,key)
 	end
 	if typeof(ToBeEncrypted) == 'number' or typeof(ToBeEncrypted) == 'string' then
 		ToBeEncrypted = tostring(ToBeEncrypted)
-		return ECB_256(encrypt,key,ToBeEncrypted),key
+		local res = ECB_256(encrypt,key,ToBeEncrypted)
+		return res,key
 	elseif typeof(ToBeEncrypted) == 'table' then
 		local NewTable = {}
 		local IsDict = true
@@ -521,33 +558,157 @@ local function MainEncrypt(ToBeEncrypted,key)
 				NewTable[Index] = value
 			end
 		end
-		return NewTable
+		return NewTable,key
 	end
 end
 
-function module.new(Message,EncryptType)
+function module:DecodeMessage(Message,Seed)
+	local function IsValid(Chosen,Order)
+		for i,v in pairs(Order) do 
+			if i == Chosen then return false end
+		end
+		return true
+	end
 
-	local key = 0x68C756C6C186436C9EC51C174C32AE81761389B5E5904E30BA57CCD911290ECC
-	--[[spawn(function()
-		table.insert(DecryptionKeys)
-		task.wait(3)
-		table.remove(DecryptionKeys,table.find(DecryptionKeys))
-	end)]]
-	if EncryptType == 'Encrypt' then
-		if typeof(Message) == 'string' or typeof(Message) == 'number' then
-			local Encrypted = ECB_256(encrypt,key,Message)
-			return Encrypted
-		elseif typeof(Message) == 'table' then
-			local EncryptedMessage = {}
-			local IsDictionary = true
-			for i,v in ipairs(Message) do 
-				IsDictionary = false
-				local EncryptedIndex = ECB_256(encrypt,key,i)
+	local random
+	if not Seed then
+		random = Random.new(tick())
+	else
+		random = Random.new(Seed)
+	end
+	local BaseOrder = {}
+	local Index = 0 
+	for i = 0, 255 do 
+		Index = Index + 1
+		local Char = string.char(i)
+		if not BaseOrder[Char] then
+			local Valid = false
+			local Chosen = random:NextInteger(0,255)
+			while not Valid do 
+				if IsValid(Chosen,BaseOrder) then 
+					BaseOrder[Chosen] = Char
+					Valid = true
+				else
+					Chosen = random:NextInteger(0,255)
+				end
 			end
 		end
+	end
+	local DecodedMessage = ''
+	if typeof(Message) == 'string' then
+		for i,v in ipairs(string.split(Message,'/')) do 
+			if tonumber(v) then
+				DecodedMessage = DecodedMessage .. BaseOrder[tonumber(v)]
+			end
+		end
+	elseif typeof(Message) == 'table' then
+		DecodedMessage = {}
+		for i,v in pairs(Message) do 
+			local NewIndex = ''
+			local NewValue = ''
+			for Index,Value in ipairs(string.split(i,'/')) do 
+				local Char = BaseOrder[tonumber(Value)]
+				if Char then
+					NewIndex = NewIndex .. Char
+				end
+			end
+			for Index,Value in ipairs(string.split(v,'/')) do 
+				local Char = BaseOrder[tonumber(Value)]
+				if Char then
+					NewValue = NewValue .. Char
+				end
+			end
+			DecodedMessage[NewIndex] = NewValue
+		end
+	end
+	BaseOrder = {123}
+	return DecodedMessage
+end
+
+function module:EncodeMessage(Message,Seed)
+
+	local function IsValid(Chosen,Order)
+		for i,v in pairs(Order) do 
+			if v == Chosen then return false end
+		end
+		return true
+	end
+
+	local random
+	if not Seed then
+		random = Random.new(tick())
+	else
+		random = Random.new(Seed)
+	end
+	Seed = tick()
+	local BaseOrder = {}
+	local Index = 0 
+	for i = 0, 255 do 
+		Index = Index + 1
+		local Char = string.char(i)
+		if not BaseOrder[Char] then
+			local Valid = false
+			local Chosen = random:NextInteger(1,255)
+			while not Valid do 
+				if IsValid(Chosen,BaseOrder) then 
+					BaseOrder[Char] = Chosen
+					Valid = true
+				else
+					Chosen = random:NextInteger(1,255)
+				end
+			end
+		end
+	end
+	local EncodedMessage = ''
+	if typeof(Message) == 'string' then
+		for i = 1, string.len(tostring(Message)) do 
+			local Char = string.sub(Message,i,i)
+			if BaseOrder[Char] then
+				EncodedMessage = EncodedMessage .. BaseOrder[Char] .. '/'
+			end
+		end
+
+	elseif typeof(Message) == 'table' then
+		EncodedMessage = {}
+		for i,v in pairs(Message) do 
+			local NewIndex = ''
+			local NewValue = ''
+			for I = 1, string.len(tostring(i)) do 
+				local IndexChar = string.sub(i,I,I)
+				if BaseOrder[IndexChar] then
+					NewIndex = NewIndex .. BaseOrder[IndexChar] .. '/'
+				end
+			end
+			for I = 1, string.len(tostring(v)) do 
+				local ValueChar = string.sub(v,I,I)
+				if BaseOrder[ValueChar] then
+					NewValue = NewValue .. BaseOrder[ValueChar] .. '/'
+				end
+			end
+			EncodedMessage[NewIndex] = NewValue
+		end
+	end
+	BaseOrder = {123}
+	warn(EncodedMessage)
+	return EncodedMessage,Seed
+end
+
+function module.new(Message,EncryptType,key)
+	local Actualmessage = ''
+	if EncryptType == 'Encrypt' then
+		return MainEncrypt(Message)
 	elseif EncryptType == 'Decrypt' then
-		local Decrypted = ECB_256(decrypt,key,Message)
-		return Decrypted
+		local res = MainDecrypt(Message,key)
+		
+		--[[for i = 1, string.len(res) do 
+			local Char = string.sub(res,i,i)
+			local Code = string.byte(Char)
+			if Code ~= 0 then
+				Actualmessage = Actualmessage .. Char
+			end
+		end]]
+		--return Actualmessage
+		return res
 	end
 end
 
