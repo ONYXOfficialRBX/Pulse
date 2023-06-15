@@ -384,13 +384,29 @@ local function MainEncrypt(ToBeEncrypted,key)
 		for i,v in ipairs(ToBeEncrypted) do 
 			IsDict = false
 			local Index = i
-			local Value = MainEncrypt(tostring(v),key)
+			local Value
+			if typeof(v) == 'string' then
+				Value = MainEncrypt(tostring(v),key)
+			else
+				Value = v
+			end
+
 			NewTable[Index] = Value
 		end
 		if IsDict then
 			for i,v in pairs(ToBeEncrypted) do 
-				local Index = MainEncrypt(tostring(i),key)
-				local value = MainEncrypt(tostring(v),key)
+				local Index
+				local value
+				if typeof(v) == 'string' then
+					value = MainEncrypt(tostring(v),key)
+				else
+					value = v
+				end
+				if typeof(i) == 'string' then
+					Index = MainEncrypt(tostring(i),key)
+				else
+					Index = i
+				end
 				NewTable[Index] = value
 			end
 		end
@@ -398,13 +414,57 @@ local function MainEncrypt(ToBeEncrypted,key)
 	end
 end
 local Sec = require(game.ReplicatedStorage.Pulse.Lib.AES_Security)
+
+local function EncryptData(Message,key)
+	warn(key)
+	if typeof(Message) ~= 'table' then return Message end
+	if typeof(Message) == 'table' then
+		local newTable = {}
+		for i,v in pairs(Message) do 
+			local newIndex 
+			local newValue
+			if typeof(i) ~= 'table' then
+				warn(i)
+				newIndex = ECB_256(encrypt,key,tostring(i))
+			else
+				i = EncryptData(i,key)
+				newIndex = i 
+			end
+			if typeof(v) ~= 'table' then
+				newValue = ECB_256(encrypt,key,tostring(v))
+			else
+				v = EncryptData(v,key)
+				newValue = v
+			end
+			newTable[newIndex] = newValue
+		end
+		return newTable
+	end
+end
+
+local function EncryptTable(MainData)
+	
+end
+
 function module.new(Message,EncryptType,key)
 	--if not Sec:Auth()() then warn('fail') return end
 	if not key then
 		key = Generate256BitAESKey()
 	end
+	print(Generate256BitAESKey())
+	print(key)
+	Message = EncryptData(Message,key)
+	warn(Message)
 	if EncryptType == 'Encrypt' then
-		if typeof(Message) == 'string' or typeof(Message) == 'number' then
+		return Sec:StoreKey(Message),key
+		--[[if typeof(Message) == 'string' then
+			local Encrypted = ECB_256(encrypt,key,Message)
+			return Sec:StoreKey(Encrypted),Sec:EncodeMessage(key)
+			
+		end]]
+		
+		
+		--[[if typeof(Message) == 'string' or typeof(Message) == 'number' then
 			local Encrypted = ECB_256(encrypt,key,Message)
 			return Sec:StoreKey(Encrypted),Sec:EncodeMessage(key)
 		elseif typeof(Message) == 'table' then
@@ -412,12 +472,33 @@ function module.new(Message,EncryptType,key)
 			local IsDictionary = true
 			for i,v in pairs(Message) do 
 				IsDictionary = false
-				local EncryptedIndex = ECB_256(encrypt,key,tostring(i))
-				local EncryptedValue = ECB_256(encrypt,key,tostring(v))
+				if typeof(Message) == 'table' then
+					for i,v in ipairs(Message) do 
+						if typeof(v) == 'table' and typeof(i) ~= 'table' then
+							Message[tostring(i)] = v 
+						elseif typeof(i) == 'table' and typeof(v) ~= 'table' then
+							Message[i] = tostring(v)
+						end
+
+					end
+				end
+				local EncryptedIndex
+				warn(Message)
+				if typeof(i) ~= 'table' then
+					EncryptedIndex = ECB_256(encrypt,key,i)
+				else
+					EncryptedIndex = i
+				end
+				local EncryptedValue
+				if typeof(v) ~= 'table' then
+					EncryptedValue = ECB_256(encrypt,key,v)
+				else
+					EncryptedValue = v
+				end
 				EncryptedMessage[EncryptedIndex] = EncryptedValue
 			end
 			return Sec:StoreKey(EncryptedMessage),key
-		end
+		end]]
 	elseif EncryptType == 'Decrypt' then
 		return nil
 	end

@@ -27,6 +27,49 @@ function module:Auth()
 	return RealAuth
 end
 
+local function EncodeMessage(message,BaseOrder)
+	local NewMessage 
+	
+	if typeof(message) == 'table' then
+		NewMessage = {}
+		for i,v in pairs(message) do 
+			local newIndex = ''
+			local newValue = ''
+			if typeof(i) == 'table' then
+				newIndex = EncodeMessage(i,BaseOrder)
+			else
+				for I = 1, string.len(tostring(i)) do 
+					local Char = string.sub(i,I,I)
+					if BaseOrder[Char] then
+						newIndex = newIndex .. BaseOrder[Char] .. '/'
+					end
+				end
+			end
+			if typeof(v) == 'table' then
+				newValue = EncodeMessage(v,BaseOrder)
+			else
+				for I = 1, string.len(tostring(v)) do 
+					local Char = string.sub(v,I,I)
+					if BaseOrder[Char] then
+						newValue = newValue .. BaseOrder[Char] .. '/'
+					end
+				end
+			end
+			NewMessage[newIndex] = newValue
+		end
+	else
+		warn(message)
+		NewMessage = ''
+		for i = 1, string.len(tostring(message)) do 
+			local Char = string.sub(message,i,i)
+			if BaseOrder[Char] then
+				NewMessage = NewMessage .. BaseOrder[Char] .. '/'
+			end
+		end
+	end
+	return NewMessage
+end
+
 function module:EncodeMessage(Message,Seed)
 	local function IsValid(Chosen,Order)
 		for i,v in pairs(Order) do 
@@ -47,7 +90,7 @@ function module:EncodeMessage(Message,Seed)
 	local Index = 0 
 	for i = 0, 255 do 
 		local Char = string.char(i)
-		
+
 		if not BaseOrder[Char] then
 			local Valid = false
 			local Chosen = random:NextInteger(0,255)
@@ -67,7 +110,10 @@ function module:EncodeMessage(Message,Seed)
 			end
 		end
 	end
-	local EncodedMessage = ''
+	warn(Message)
+	local EncodedMessage = EncodeMessage(Message,BaseOrder)
+	warn(EncodedMessage)
+	--[[local EncodedMessage = ''
 	if typeof(Message) == 'string' or typeof(Message) == 'number' then
 		for i = 1, string.len(tostring(Message)) do 
 			local Char = string.sub(Message,i,i)
@@ -81,25 +127,35 @@ function module:EncodeMessage(Message,Seed)
 		for i,v in pairs(Message) do 
 			local NewIndex = ''
 			local NewValue = ''
-			for I = 1, string.len(tostring(i)) do 
-				local IndexChar = string.sub(i,I,I)
-				if BaseOrder[IndexChar] then
-					NewIndex = NewIndex .. BaseOrder[IndexChar] .. '/'
-				else
-					warn('Invalid: ' .. IndexChar)
+			if typeof(i) == 'string' then
+				for I = 1, string.len(tostring(i)) do 
+					local IndexChar = string.sub(i,I,I)
+					if BaseOrder[IndexChar] then
+						NewIndex = NewIndex .. BaseOrder[IndexChar] .. '/'
+					else
+						warn('Invalid: ' .. IndexChar)
+					end
 				end
 			end
-			for I = 1, string.len(tostring(v)) do 
-				local ValueChar = string.sub(v,I,I)
-				if BaseOrder[ValueChar] then
-					NewValue = NewValue .. BaseOrder[ValueChar] .. '/'
-				else
-					warn('Invalid: ' .. ValueChar)
+			if typeof(v) == 'string' then
+				for I = 1, string.len(tostring(v)) do 
+					local ValueChar = string.sub(v,I,I)
+					if BaseOrder[ValueChar] then
+						NewValue = NewValue .. BaseOrder[ValueChar] .. '/'
+					else
+						warn('Invalid: ' .. ValueChar)
+					end
 				end
+			end
+			if typeof(v) == 'table' then
+				NewValue = v
+			end
+			if typeof(i) == 'table' then
+				NewIndex = i
 			end
 			EncodedMessage[NewIndex] = NewValue
 		end
-	end
+	end]]
 	BaseOrder = {123}
 	return EncodedMessage,Seed
 end
