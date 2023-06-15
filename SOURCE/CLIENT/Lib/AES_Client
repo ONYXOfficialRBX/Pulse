@@ -352,7 +352,7 @@ local random = Random.new(tick())
 -- Function to generate a 256-bit AES key
 local function Generate256BitAESKey()
 	local random = Random.new(tick())
-	return random:NextInteger(2^52 * -1,2^52) * random:NextInteger(1,1000000000000)
+	return random:NextInteger(2^52 * -1,2^52) * random:NextInteger(1,100)
 end
 local function ConvertAESKeyFromString(keyString)
 	local key = {}
@@ -399,19 +399,19 @@ local function MainEncrypt(ToBeEncrypted,key)
 end
 local Sec = require(game.ReplicatedStorage.Pulse.Lib.AES_Security)
 function module.new(Message,EncryptType,key)
+	--if not Sec:Auth()() then warn('fail') return end
 	if not key then
 		key = Generate256BitAESKey()
 	end
+	print(key)
 	if EncryptType == 'Encrypt' then
-		warn(typeof(Message))
 		if typeof(Message) == 'string' or typeof(Message) == 'number' then
 			local Encrypted = ECB_256(encrypt,key,Message)
-			warn('a')
-			return Sec:StoreKey(Encrypted),key
+			return Sec:StoreKey(Encrypted),Sec:EncodeMessage(key)
 		elseif typeof(Message) == 'table' then
 			local EncryptedMessage = {}
 			local IsDictionary = true
-			for i,v in ipairs(Message) do 
+			for i,v in pairs(Message) do 
 				IsDictionary = false
 				local EncryptedIndex = ECB_256(encrypt,key,tostring(i))
 				local EncryptedValue = ECB_256(encrypt,key,tostring(v))

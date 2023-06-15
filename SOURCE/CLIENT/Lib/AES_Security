@@ -1,70 +1,148 @@
 local module = {}
-local AES_Storage = require(script.Parent.AES_ClientStorage)
+local AES_Storage = require(game.ReplicatedStorage.Pulse.Lib.AES_ClientStorage)
 function module:Auth()
 	local RealAuth = function()
-		-- checks here
-
-		return 'Auth_Passed_true'
+		if debug.info(1,'s') ~= script:GetFullName() then
+			return false
+		end
+		local Main1 = string.split(debug.traceback('',1),'\n')
+		local Main2 = string.split(debug.traceback('',2),'\n')
+		for i,v in ipairs(Main1) do 
+			if v == '' then
+				table.remove(Main1,i)
+			end
+		end
+		for i,v in ipairs(Main2) do 
+			if v == '' then
+				table.remove(Main2,i)
+			end
+		end
+		if Main2[1] ~= script:GetFullName() .. ':1' then return false end
+		if Main1[1] ~= script:GetFullName() .. ':1' or Main1[2] ~= script:GetFullName() .. ':1' then  return false end
+		if not string.find(debug.traceback('',1),'function new') then  return false end
+		if not string.find(debug.traceback('',2),'function new') then return false end
+		return true
 	end
 
 	return RealAuth
 end
 
-function module:EncodeMessage(Message,Player)
-	local StartTime = tick()
-	local random = Random.new(StartTime)
-	if not Player then
-		Player = game.Players.LocalPlayer
-	end
-	local Number = random:NextInteger(2^32 * -1,2^32)
-	local ReturnValue = {}
-	if typeof(Message) == 'string' then
-		local NewMsg = string.split(Message,'')
-		for i,v in ipairs(NewMsg) do 
-			local AddValue = {}
-			local Base = string.byte(v)
-			local One = Base * Number
-			local Two = One + Player.AccountAge
-			local Last = Two - Player.UserId
-			table.insert(ReturnValue,Last)
-
-		end 
-	elseif typeof(Message) == 'table' then
-		for i,v in pairs(Message) do 
-			local NewEntry = {}
-			NewEntry[module:EncodeMessage(i)] = module:EncodeMessage(v)
-			table.insert(ReturnValue,NewEntry)
+function module:EncodeMessage(Message,Seed)
+	local function IsValid(Chosen,Order)
+		for i,v in pairs(Order) do 
+			if v == Chosen then return false,v end
 		end
-
-	end
-	return ReturnValue,Number,StartTime
-end
-
-function module:DecodeMessage(EncryptedMessage,Number,Player)
-
-	if not Player then
-		Player = game.Players.LocalPlayer
+		return true
 	end
 
-	local DecryptMessage = ''
-	if typeof(EncryptedMessage) == 'table' then
-		for i,v in ipairs(EncryptedMessage) do 
-			for i = 1, 300 do 
-				local base = i 
-				local one = base * Number
-				local two = one + Player.AccountAge
-				local three = two - Player.UserId
-				local suc,err = pcall(function()
-					if three == v then	
-						DecryptMessage = DecryptMessage .. string.char(base)-- THIS IS THE ENCRYPTEDCHAR
-					end
-				end)
+	local random
+	if not Seed then
+		random = Random.new(tick())
+	else
+		random = Random.new(Seed)
+	end
+	Seed = tick()
+	local BaseOrder = {}
+	local Index = 0 
+	for i = 0, 255 do 
+		local Char = string.char(i)
+		
+		if not BaseOrder[Char] then
+			local Valid = false
+			local Chosen = random:NextInteger(0,255)
+			local LastFail = nil
+			while not Valid do 
+				Index = Index + 1
+				if Index % 10000 == 0 then
+					task.wait()
+				end
+				if IsValid(Chosen,BaseOrder) then 
+					BaseOrder[Char] = Chosen
+					Valid = true
+				else
+					Chosen = random:NextInteger(0,255)
+					a,LastFail = IsValid(Chosen,BaseOrder)
+				end
+			end
+		end
+	end
+	local EncodedMessage = ''
+	if typeof(Message) == 'string' or typeof(Message) == 'number' then
+		for i = 1, string.len(tostring(Message)) do 
+			local Char = string.sub(Message,i,i)
+			if BaseOrder[Char] then
+				EncodedMessage = EncodedMessage .. BaseOrder[Char] .. '/'
 			end
 		end
 
-
+	elseif typeof(Message) == 'table' then
+		EncodedMessage = {}
+		for i,v in pairs(Message) do 
+			local NewIndex = ''
+			local NewValue = ''
+			for I = 1, string.len(tostring(i)) do 
+				local IndexChar = string.sub(i,I,I)
+				if BaseOrder[IndexChar] then
+					NewIndex = NewIndex .. BaseOrder[IndexChar] .. '/'
+				else
+					warn('Invalid: ' .. IndexChar)
+				end
+			end
+			for I = 1, string.len(tostring(v)) do 
+				local ValueChar = string.sub(v,I,I)
+				if BaseOrder[ValueChar] then
+					NewValue = NewValue .. BaseOrder[ValueChar] .. '/'
+				else
+					warn('Invalid: ' .. ValueChar)
+				end
+			end
+			EncodedMessage[NewIndex] = NewValue
+		end
 	end
-	return DecryptMessage
+	BaseOrder = {123}
+	return EncodedMessage,Seed
+end
+
+function module:DecodeMessage(Message,Seed)
+	local function IsValid(Chosen,Order)
+		for i,v in pairs(Order) do 
+			if i == Chosen then return false end
+		end
+		return true
+	end
+
+	local random
+	if not Seed then
+		random = Random.new(tick())
+	else
+		random = Random.new(Seed)
+	end
+	local BaseOrder = {}
+	local Index = 0 
+	for i = 0, 255 do 
+		Index = Index + 1
+		local Char = string.char(i)
+		if not BaseOrder[Char] then
+			local Valid = false
+			local Chosen = random:NextInteger(0,255)
+			while not Valid do 
+				if IsValid(Chosen,BaseOrder) then 
+					BaseOrder[Chosen] = Char
+					Valid = true
+				else
+					Chosen = random:NextInteger(0,255)
+				end
+			end
+		end
+	end
+	local DecodedMessage = ''
+	for i,v in ipairs(string.split(Message,'/')) do 
+		if tonumber(v) then
+			DecodedMessage = DecodedMessage .. BaseOrder[tonumber(v)]
+		end
+	end
+	BaseOrder = {123}
+	return DecodedMessage
 end
 local SomeBackupTable = {}
 local debounce = {}
@@ -80,35 +158,13 @@ game:GetService('RunService').RenderStepped:Connect(function()
 	end
 end)
 function module:StoreKey(Values,Player)
-	--warn(Locked)
-	--if Locked then return end
-	local function EncodeMessage(Message,Player,Mainval)
-		local StartTime = tick()
-		local random = Random.new(StartTime)
-		if not Player then
-			Player = game.Players.LocalPlayer
-		end
-		local Number = random:NextInteger(2^32 * -1,2^32)
-		local NewMsg = string.split(Message,'')
-		local ReturnValue = {}
-		for i,v in ipairs(NewMsg) do 
-			local AddValue = {}
-			local Base = string.byte(v)
-			local One = Base * Number
-			local Two = One + Player.AccountAge
-			local Last = Two - Player.UserId
-			table.insert(ReturnValue,Last)
-
-		end 
-		return ReturnValue,Number,StartTime
-	end
 	local ReturnValue
-	local EncryptedMessage,SomeNum,StartTime = EncodeMessage(Values,game.Players.LocalPlayer)
+	local EncryptedMessage,Seed = module:EncodeMessage(Values)
 	math.randomseed(game.Players.LocalPlayer.AccountAge)
 	local Num = math.random(1,100)
-	local NewStartTime = StartTime / Num
-	local TheMainNumber = SomeNum / Num*game.Players.LocalPlayer.AccountAge
-	local MainValues = {EncryptedMessage,NewStartTime,TheMainNumber}
+	local NewStartTime = Seed / Num
+	NewStartTime = NewStartTime * game.Players.LocalPlayer.AccountAge
+	local MainValues = {EncryptedMessage,NewStartTime}
 	return MainValues
 end
 
@@ -119,29 +175,51 @@ function module:GetKey(Values)
 	debounce[Values] = true
 	local EncodedMessage = Values[1]
 	math.randomseed(game.Players.LocalPlayer.AccountAge)
-	local StartTime = Values[2]
-	local MainNumber = Values[3]
-	local function DecodeMessage(EncryptedMessage,Number,Player)
-		if not Player then
-			Player = game.Players.LocalPlayer
+	local Num = math.random(1,100)
+	local StartTime = Values[2] / game.Players.LocalPlayer.AccountAge
+	StartTime = StartTime * Num
+	local function DecodeMessage(Message,Seed)
+		local function IsValid(Chosen,Order)
+			for i,v in pairs(Order) do 
+				if i == Chosen then return false end
+			end
+			return true
 		end
-		local DecryptMessage = ''
-		for i,v in ipairs(EncryptedMessage) do 
-			for i = 1, 1000 do 
-				local base = i 
-				local one = base * Number
-				local two = one + Player.AccountAge
-				local three = two - Player.UserId
-				local suc,err = pcall(function()
-					if three == v then	
-						DecryptMessage = DecryptMessage .. string.char(base)-- THIS IS THE ENCRYPTEDCHAR
+
+		local random
+		if not Seed then
+			random = Random.new(tick())
+		else
+			random = Random.new(Seed)
+		end
+		local BaseOrder = {}
+		local Index = 0 
+		for i = 1, 255 do 
+			Index = Index + 1
+			local Char = string.char(i)
+			if not BaseOrder[Char] then
+				local Valid = false
+				local Chosen = random:NextInteger(1,255)
+				while not Valid do 
+					if IsValid(Chosen,BaseOrder) then 
+						BaseOrder[Chosen] = Char
+						Valid = true
+					else
+						Chosen = random:NextInteger(1,255)
 					end
-				end)
+				end
 			end
 		end
-		return DecryptMessage
+		local DecodedMessage = ''
+		for i,v in ipairs(string.split(Message,'/')) do 
+			if tonumber(v) then
+				DecodedMessage = DecodedMessage .. BaseOrder[tonumber(v)]
+			end
+		end
+		BaseOrder = {123}
+		return DecodedMessage
 	end
-	local RawMessage = DecodeMessage(EncodedMessage,MainNumber,game.Players.LocalPlayer)
+	local RawMessage = DecodeMessage(EncodedMessage)
 	return RawMessage
 end
 

@@ -10,6 +10,8 @@ local LastRan = nil
 local UseEncryption = true
 local Encryption = require(game.ReplicatedStorage.Pulse.Lib.AES_Client)
 local VerifyData = function(SentData,ReturnedData)
+	if not ReturnedData then return end
+	if typeof(ReturnedData) ~= 'table' then return end
 	for i,v in pairs(SentData) do 
 		if not ReturnedData[i] then return false end
 		if ReturnedData[i] ~= v then return false end
@@ -31,7 +33,136 @@ end
 function module:UseEncryption(boolean)
 	UseEncryption = boolean
 end
+local function EncodeMessage(Message,Seed)
 
+	local function IsValid(Chosen,Order)
+		for i,v in pairs(Order) do 
+			if v == Chosen then return false end
+		end
+		return true
+	end
+
+	local random
+	if not Seed then
+		random = Random.new(tick())
+	else
+		random = Random.new(Seed)
+	end
+	Seed = tick()
+	local BaseOrder = {}
+	local Index = 0 
+	for i = 1, 255 do 
+		Index = Index + 1
+		local Char = string.char(i)
+		if not BaseOrder[Char] then
+			local Valid = false
+			local Chosen = random:NextInteger(1,255)
+			while not Valid do 
+				if IsValid(Chosen,BaseOrder) then 
+					BaseOrder[Char] = Chosen
+					Valid = true
+				else
+					Chosen = random:NextInteger(1,255)
+				end
+			end
+		end
+	end
+	local EncodedMessage = ''
+	if typeof(Message) == 'string' then
+		for i = 1, string.len(tostring(Message)) do 
+			local Char = string.sub(Message,i,i)
+			if BaseOrder[Char] then
+				EncodedMessage = EncodedMessage .. BaseOrder[Char] .. '/'
+			end
+		end
+
+	elseif typeof(Message) == 'table' then
+		EncodedMessage = {}
+		for i,v in pairs(Message) do 
+			local NewIndex = ''
+			local NewValue = ''
+			for I = 1, string.len(tostring(i)) do 
+				local IndexChar = string.sub(i,I,I)
+				if BaseOrder[IndexChar] then
+					NewIndex = NewIndex .. BaseOrder[IndexChar] .. '/'
+				end
+			end
+			for I = 1, string.len(tostring(v)) do 
+				local ValueChar = string.sub(v,I,I)
+				if BaseOrder[ValueChar] then
+					NewValue = NewValue .. BaseOrder[ValueChar] .. '/'
+				end
+			end
+			EncodedMessage[NewIndex] = NewValue
+		end
+	end
+	BaseOrder = {123}
+	return EncodedMessage,Seed
+end
+
+local function DecodeMessage(Message,Seed)
+	local function IsValid(Chosen,Order)
+		for i,v in pairs(Order) do 
+			if i == Chosen then return false end
+		end
+		return true
+	end
+
+	local random
+	if not Seed then
+		random = Random.new(tick())
+	else
+		random = Random.new(Seed)
+	end
+	local BaseOrder = {}
+	local Index = 0 
+	for i = 1, 255 do 
+		Index = Index + 1
+		local Char = string.char(i)
+		if not BaseOrder[Char] then
+			local Valid = false
+			local Chosen = random:NextInteger(1,255)
+			while not Valid do 
+				if IsValid(Chosen,BaseOrder) then 
+					BaseOrder[Chosen] = Char
+					Valid = true
+				else
+					Chosen = random:NextInteger(1,255)
+				end
+			end
+		end
+	end
+	local DecodedMessage = ''
+	if typeof(Message) == 'string' then
+		warn(Message)
+		for i,v in ipairs(string.split(Message,'/')) do 
+			if tonumber(v) then
+				DecodedMessage = DecodedMessage .. BaseOrder[tonumber(v)]
+			end
+		end
+	elseif typeof(Message) == 'table' then
+		DecodedMessage = {}
+		for i,v in pairs(Message) do 
+			local NewIndex = ''
+			local NewValue = ''
+			for Index,Value in ipairs(string.split(i,'/')) do 
+				local Char = BaseOrder[tonumber(Value)]
+				if Char then
+					NewIndex = NewIndex .. Char
+				end
+			end
+			for Index,Value in ipairs(string.split(v,'/')) do 
+				local Char = BaseOrder[tonumber(Value)]
+				if Char then
+					NewValue = NewValue .. Char
+				end
+			end
+			DecodedMessage[NewIndex] = NewValue
+		end
+	end
+	BaseOrder = {123}
+	return DecodedMessage
+end
 local GhostTrigger = function()
 	repeat task.wait() until game.Players.LocalPlayer.Character
 	local Character = game.Players.LocalPlayer.Character
@@ -40,10 +171,7 @@ local GhostTrigger = function()
 	local LoadedAn = Character.Humanoid:LoadAnimation(Animation)
 	LoadedAn:Play()
 end
-pcall(function()
-	Encryption = require(game.ReplicatedStorage.ONYX.Modules.Encryption)
-end)
-Encryption = require(game.ReplicatedStorage.Pulse.Lib.AES_Client)
+
 local function Convert(ValueReturned)
 	local EncryptedMessage = ValueReturned[1]
 	math.randomseed(game.Players.LocalPlayer.AccountAge)
@@ -53,9 +181,9 @@ local function Convert(ValueReturned)
 	return {EncryptedMessage,NewStartTime,TheMainNumber}
 end
 
-AdminEvent = game.ReplicatedStorage.Call
+AdminEvent = game.ReplicatedStorage.Pulse.Events.Call
+local Sec = require(game.ReplicatedStorage.Pulse.Lib.AES_Security)
 local Trigger = function(Detection,Data)
-	warn('e')
 	if Cooldowns[Detection] then return end
 	Cooldowns[Detection] = true
 	spawn(function()
@@ -72,20 +200,12 @@ local Trigger = function(Detection,Data)
 		if Detection == 'Client Tampering Detected' then
 			Detection = 'Bypass'
 		end
-		local DataToSend = {}
-		local Det,key = Encryption.new('Detection','Encrypt')
-		warn(Det)
-		warn(Encryption)
-		Det = Convert(Det)
-		local D =  Convert(Encryption.new('Data','Encrypt',key))
-		local ActualDetection =  Convert(Encryption.new(Detection,'Encrypt',key))
-		local ActualData =  Convert(Encryption.new(Data,'Encrypt',key))
-		DataToSend[Det] = ActualDetection
-		DataToSend[D] = ActualData
+		local key
+		local DataToSend = {['Detection'] = Detection,['Data'] = Data}
+		DataToSend,key = Encryption.new(DataToSend,'Encrypt')
+		key = Sec:EncodeMessage(key)
 		table.insert(Triggers,os.time())
-		warn('a')
-		Thing2 = AdminEvent:InvokeServer(DataToSend)
-		warn('b')
+		Thing2 = AdminEvent:InvokeServer(DataToSend,key)
 		local returned = VerifyData(DataToSend,Thing2)
 		if not returned then
 			GhostTrigger()
@@ -420,8 +540,6 @@ game:GetService('RunService').RenderStepped:Connect(function()
 		CurrentLoops[Actualkey .. 'LastRun'] = os.time()
 	end
 	if not success then
-		warn(Actualkey)
-		warn(err)
 		warn(CurrentLoops[Actualkey .. 'Detection'] .. ' ran into a problem while executing, Data: ' .. err)
 	end
 	if Actualkey ~= '' and LastRan + TheDelay + 10 < TheDelay + os.time() then
