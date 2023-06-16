@@ -512,7 +512,6 @@ end
 
 local function DecodeMessage(Message,BaseOrder)
 	local NewMessage 
-	warn(Message)
 	if typeof(Message) == 'table' then
 		NewMessage = {}
 		for i,v in pairs(Message) do 
@@ -543,9 +542,7 @@ local function DecodeMessage(Message,BaseOrder)
 	else
 		local newmsg = ''
 		for I,V in ipairs(string.split(Message,'/')) do 
-			warn(BaseOrder)
 			local Char = BaseOrder[tonumber(V)]
-			warn(Char)
 			if Char then
 				newmsg = newmsg .. Char 
 			end
@@ -588,7 +585,6 @@ function module:DecodeMessage(Message,Seed)
 		end
 	end
 	local DecodedMessage = DecodeMessage(Message,BaseOrder)
-	warn(DecodedMessage)
 	return DecodedMessage
 end
 
@@ -656,7 +652,6 @@ function module:EncodeMessage(Message,Seed)
 		end
 	end
 	BaseOrder = {123}
-	warn(EncodedMessage)
 	return EncodedMessage,Seed
 end
 

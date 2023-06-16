@@ -58,7 +58,6 @@ local function EncodeMessage(message,BaseOrder)
 			NewMessage[newIndex] = newValue
 		end
 	else
-		warn(message)
 		NewMessage = ''
 		for i = 1, string.len(tostring(message)) do 
 			local Char = string.sub(message,i,i)
@@ -110,52 +109,7 @@ function module:EncodeMessage(Message,Seed)
 			end
 		end
 	end
-	warn(Message)
 	local EncodedMessage = EncodeMessage(Message,BaseOrder)
-	warn(EncodedMessage)
-	--[[local EncodedMessage = ''
-	if typeof(Message) == 'string' or typeof(Message) == 'number' then
-		for i = 1, string.len(tostring(Message)) do 
-			local Char = string.sub(Message,i,i)
-			if BaseOrder[Char] then
-				EncodedMessage = EncodedMessage .. BaseOrder[Char] .. '/'
-			end
-		end
-
-	elseif typeof(Message) == 'table' then
-		EncodedMessage = {}
-		for i,v in pairs(Message) do 
-			local NewIndex = ''
-			local NewValue = ''
-			if typeof(i) == 'string' then
-				for I = 1, string.len(tostring(i)) do 
-					local IndexChar = string.sub(i,I,I)
-					if BaseOrder[IndexChar] then
-						NewIndex = NewIndex .. BaseOrder[IndexChar] .. '/'
-					else
-						warn('Invalid: ' .. IndexChar)
-					end
-				end
-			end
-			if typeof(v) == 'string' then
-				for I = 1, string.len(tostring(v)) do 
-					local ValueChar = string.sub(v,I,I)
-					if BaseOrder[ValueChar] then
-						NewValue = NewValue .. BaseOrder[ValueChar] .. '/'
-					else
-						warn('Invalid: ' .. ValueChar)
-					end
-				end
-			end
-			if typeof(v) == 'table' then
-				NewValue = v
-			end
-			if typeof(i) == 'table' then
-				NewIndex = i
-			end
-			EncodedMessage[NewIndex] = NewValue
-		end
-	end]]
 	BaseOrder = {123}
 	return EncodedMessage,Seed
 end

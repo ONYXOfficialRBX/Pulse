@@ -416,7 +416,6 @@ end
 local Sec = require(game.ReplicatedStorage.Pulse.Lib.AES_Security)
 
 local function EncryptData(Message,key)
-	warn(key)
 	if typeof(Message) ~= 'table' then return Message end
 	if typeof(Message) == 'table' then
 		local newTable = {}
@@ -424,7 +423,6 @@ local function EncryptData(Message,key)
 			local newIndex 
 			local newValue
 			if typeof(i) ~= 'table' then
-				warn(i)
 				newIndex = ECB_256(encrypt,key,tostring(i))
 			else
 				i = EncryptData(i,key)
@@ -451,54 +449,9 @@ function module.new(Message,EncryptType,key)
 	if not key then
 		key = Generate256BitAESKey()
 	end
-	print(Generate256BitAESKey())
-	print(key)
 	Message = EncryptData(Message,key)
-	warn(Message)
 	if EncryptType == 'Encrypt' then
 		return Sec:StoreKey(Message),key
-		--[[if typeof(Message) == 'string' then
-			local Encrypted = ECB_256(encrypt,key,Message)
-			return Sec:StoreKey(Encrypted),Sec:EncodeMessage(key)
-			
-		end]]
-		
-		
-		--[[if typeof(Message) == 'string' or typeof(Message) == 'number' then
-			local Encrypted = ECB_256(encrypt,key,Message)
-			return Sec:StoreKey(Encrypted),Sec:EncodeMessage(key)
-		elseif typeof(Message) == 'table' then
-			local EncryptedMessage = {}
-			local IsDictionary = true
-			for i,v in pairs(Message) do 
-				IsDictionary = false
-				if typeof(Message) == 'table' then
-					for i,v in ipairs(Message) do 
-						if typeof(v) == 'table' and typeof(i) ~= 'table' then
-							Message[tostring(i)] = v 
-						elseif typeof(i) == 'table' and typeof(v) ~= 'table' then
-							Message[i] = tostring(v)
-						end
-
-					end
-				end
-				local EncryptedIndex
-				warn(Message)
-				if typeof(i) ~= 'table' then
-					EncryptedIndex = ECB_256(encrypt,key,i)
-				else
-					EncryptedIndex = i
-				end
-				local EncryptedValue
-				if typeof(v) ~= 'table' then
-					EncryptedValue = ECB_256(encrypt,key,v)
-				else
-					EncryptedValue = v
-				end
-				EncryptedMessage[EncryptedIndex] = EncryptedValue
-			end
-			return Sec:StoreKey(EncryptedMessage),key
-		end]]
 	elseif EncryptType == 'Decrypt' then
 		return nil
 	end
