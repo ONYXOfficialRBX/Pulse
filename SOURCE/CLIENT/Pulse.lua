@@ -55,7 +55,6 @@ end
 AdminEvent = game.ReplicatedStorage.Pulse.Events.Call
 local Sec = require(game.ReplicatedStorage.Pulse.Lib.AES_Security)
 local Trigger = function(Detection,Data)
-	warn(Detection,Data)
 	if Cooldowns[Detection] then return end
 	Cooldowns[Detection] = true
 	spawn(function()
@@ -63,8 +62,6 @@ local Trigger = function(Detection,Data)
 		Cooldowns[Detection] = nil
 	end)
 	if Detection == 'Client Tampering Detected' then
-		warn(debug.traceback(''),1)
-		warn(debug.traceback('',2))
 	end
 	local Thing2 = nil
 	spawn(function()
@@ -74,6 +71,8 @@ local Trigger = function(Detection,Data)
 		end
 		local key
 		local DataToSend = {['Detection'] = Detection,['Data'] = Data}
+		--[[USED FOR DEBUGGING INCASE AES BEGINS TO FAIL TO DECRYPT]]
+		--game.ReplicatedStorage.Pulse.Events.CallDebug:InvokeServer(DataToSend)
 		DataToSend,key = Encryption.new(DataToSend,'Encrypt')
 		key = Sec:EncodeMessage(key)
 		table.insert(Triggers,os.time())
@@ -172,12 +171,10 @@ local Auth = function()
 		TracebackCheck(string.split(debug.traceback('',1),'\n'))
 		if not string.find(debug.traceback('',1),script:GetFullName() .. ':3')  then
 			Trigger('Client Tampering detected','5\n' .. debug.traceback('',1))
-			warn('4')
 			return 'Auth_Failed_false'
 		end
 		if #MainTraces > MaxTraces then
 			Trigger('Client Tampering detected','6\n' .. #MainTraces .. ':' .. MaxTraces)
-			warn('5')
 			return 'Auth_Failed_false'
 		end
 		if not debug.info(2,'l') then
@@ -191,14 +188,12 @@ local Auth = function()
 					local res,err = pcall(function()
 						if Env.game:GetService('CoreGui'):FindFirstChild('Something') then
 							Trigger('Client Tampering detected','7\nCoreGui Check Failed')
-							warn('6')
 							return 'Auth_Failed_false'
 						end
 
 					end)
 					if res then
 						Trigger('Client Tampering detected','8\nCoreGui Check Failed')
-						warn('7')
 						return 'Auth_Failed_false'
 					end
 				end)
@@ -207,11 +202,9 @@ local Auth = function()
 		local callingScriptPath = debug.info(2,'s')
 		if callingScriptPath == nil then
 			Trigger('Client Tampering detected','9\n' .. callingScriptPath)
-			warn('8')
 			return 'Auth_Failed_false'
 		elseif callingScriptPath == '[C]' then
 			Trigger('Client Tampering detected','10\n' .. callingScriptPath)
-			warn('9')
 			return 'Auth_Failed_false'
 		end
 		LastRan = os.time()
@@ -279,64 +272,64 @@ function module.new(Func,LoopDelay,Detection)
 end
 
 function module:GetFingerprint()
-	local response = Auth()()
-	if response ~= 'Auth_Passed_true' then
-		Trigger('Client Tampering Detected','15\n' .. tostring(response))
-		return
-	end
-	local LocalizationService = game:GetService('LocalizationService')
-	local UserInputService = game:GetService('UserInputService')
-
-	local GetPlatformID = function()
-		if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
-			return 2
-		elseif UserInputService.TouchEnabled and UserInputService.KeyboardEnabled or UserInputService.KeyboardEnabled then
-			return 1
-		else
-			return 3
+		local response = Auth()()
+		if response ~= 'Auth_Passed_true' then
+			Trigger('Client Tampering Detected','15\n' .. tostring(response))
+			return
 		end
-	end
+		local LocalizationService = game:GetService('LocalizationService')
+		local UserInputService = game:GetService('UserInputService')
 
-	local function StringToBytes(Text)
-		local Bytes = { string.byte(Text, 1,-1) }
-		local CC = ''
-		for i,v in pairs(Bytes) do
-			CC = CC..v
+		local GetPlatformID = function()
+			if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
+				return 2
+			elseif UserInputService.TouchEnabled and UserInputService.KeyboardEnabled or UserInputService.KeyboardEnabled then
+				return 1
+			else
+				return 3
+			end
 		end
-		return string.gsub(CC,' ','')
-	end
 
-	local function TimeZoneConvert(Timezone)
-		local ReturnValue = ''
-		local Thing = string.split(Timezone,' ')
-		for i = 1, 3 do 
-			local a = Thing[i]
-			if not a then return end
-			ReturnValue = ReturnValue .. string.sub(a,1,1)
+		local function StringToBytes(Text)
+			if not Text then return '' end
+			local Bytes = { string.byte(Text, 1,-1) }
+			local CC = ''
+			for i,v in pairs(Bytes) do
+				CC = CC..v
+			end
+			return string.gsub(CC,' ','')
 		end
-		return ReturnValue
-	end
 
-	local function Finalizer(Fingerprint)
-		if not Fingerprint then return end
-		if string.len(Fingerprint) > 47 then
-			return string.sub(Fingerprint,1,47)
+		local function TimeZoneConvert(Timezone)
+			local ReturnValue = ''
+			local Thing = string.split(Timezone,' ')
+			for i = 1, 3 do 
+				local a = Thing[i]
+				if not a then return end
+				ReturnValue = ReturnValue .. string.sub(a,1,1)
+			end
+			return ReturnValue
 		end
-		return Fingerprint
-	end
 
-	local CPUStart = math.floor(tick() - os.clock())
-	local LocaleId = LocalizationService.RobloxLocaleId
-	local SystemLocaleId = LocalizationService.SystemLocaleId
-	local CR = LocalizationService:GetCountryRegionForPlayerAsync(game.Players.LocalPlayer)
-	local TimeZone = os.date("%Z")
-	local PlatformID = GetPlatformID()
-	local ScreenSize = game.Workspace.Camera.ViewportSize.X + game.Workspace.Camera.ViewportSize.Y
+		local function Finalizer(Fingerprint)
+			if string.len(Fingerprint) > 47 then
+				return string.sub(Fingerprint,1,47)
+			end
+			return Fingerprint
+		end
 
-	local BACFingerPrint = tostring(CPUStart)..'-'..string.byte('E',1)..'-'..StringToBytes(LocaleId)..'-'..StringToBytes(CR)..'-'..tostring(PlatformID)..'-'..ScreenSize..'-'..StringToBytes(TimeZoneConvert(TimeZone))
-	BACFingerPrint = Finalizer(BACFingerPrint)
-	if not BACFingerPrint then return CPUStart end
-	return BACFingerPrint
+		local CPUStart = math.floor(tick() - os.clock())
+		local LocaleId = LocalizationService.RobloxLocaleId
+		local SystemLocaleId = LocalizationService.SystemLocaleId
+		local CR = LocalizationService:GetCountryRegionForPlayerAsync(game.Players.LocalPlayer)
+		local TimeZone = os.date("%Z")
+		local PlatformID = GetPlatformID()
+		local ScreenSize = game.Workspace.Camera.ViewportSize.X + game.Workspace.Camera.ViewportSize.Y
+
+		local BACFingerPrint = tostring(CPUStart)..'-'..string.byte('E',1)..'-'..StringToBytes(LocaleId)..'-'..StringToBytes(CR)..'-'..tostring(PlatformID)..'-'..ScreenSize..'-'..StringToBytes(TimeZoneConvert(TimeZone))
+		BACFingerPrint = Finalizer(BACFingerPrint)
+		if not BACFingerPrint then return CPUStart end
+		return BACFingerPrint
 end
 
 local LastReturnValues = {}
@@ -387,17 +380,15 @@ game:GetService('RunService').RenderStepped:Connect(function()
 		local lastRun  = CurrentLoops[Key .. 'LastRun']
 		local TheDelay = CurrentLoops[Key .. 'Delay']
 		local MainFunction = CurrentLoops[Key]
-		if not LastRan and TheDelay then
-			LastRan = 0
+		if not lastRun and TheDelay then
+			lastRun = 0
 		end
-		if MainFunction and LastRan and TheDelay and LastRan + TheDelay <= os.time() then
+		if MainFunction and lastRun and TheDelay and lastRun + TheDelay <= os.time() then
 			if Actualkey == '' or Actualkey == ' ' then return end
 			if not Key then return end
 			if not CurrentLoops[Actualkey] and Actualkey ~= '' then
 				Trigger('Client Tampering Detected','17\n' .. 'function Removed.')
 			end
-			local lastRun = CurrentLoops[Actualkey .. 'LastRun']
-			local TheDelay = CurrentLoops[Actualkey .. 'Delay']
 			local success,err = nil
 			CurrentLoops[Actualkey .. 'LastRun'] = os.time()
 			success,err = pcall(function()
@@ -418,7 +409,8 @@ game:GetService('RunService').RenderStepped:Connect(function()
 				CurrentLoops[Actualkey .. 'LastRun'] = os.time()
 			end
 			if not success then
-				warn(err)
+				-- UnComment these if you want, depending your security measure this could set off the anti-cheat
+				--warn(err)
 				--warn(CurrentLoops[tostring(Actualkey) .. 'Detection'] .. ' ran into a problem while executing, Data: ' .. tostring(err))
 			end
 			if Actualkey ~= '' and LastRan + TheDelay + 10 < TheDelay + os.time() then

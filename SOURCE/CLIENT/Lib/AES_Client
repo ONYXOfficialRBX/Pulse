@@ -380,35 +380,20 @@ local function MainEncrypt(ToBeEncrypted,key)
 		return ECB_256(encrypt,key,ToBeEncrypted),key
 	elseif typeof(ToBeEncrypted) == 'table' then
 		local NewTable = {}
-		local IsDict = true
-		for i,v in ipairs(ToBeEncrypted) do 
-			IsDict = false
-			local Index = i
-			local Value
+		for i,v in pairs(ToBeEncrypted) do 
+			local Index
+			local value
 			if typeof(v) == 'string' then
-				Value = MainEncrypt(tostring(v),key)
+				value = MainEncrypt(tostring(v),key)
 			else
-				Value = v
+				value = v
 			end
-
-			NewTable[Index] = Value
-		end
-		if IsDict then
-			for i,v in pairs(ToBeEncrypted) do 
-				local Index
-				local value
-				if typeof(v) == 'string' then
-					value = MainEncrypt(tostring(v),key)
-				else
-					value = v
-				end
-				if typeof(i) == 'string' then
-					Index = MainEncrypt(tostring(i),key)
-				else
-					Index = i
-				end
-				NewTable[Index] = value
+			if typeof(i) == 'string' then
+				Index = MainEncrypt(tostring(i),key)
+			else
+				Index = i
 			end
+			NewTable[Index] = value
 		end
 		return NewTable
 	end
@@ -441,7 +426,7 @@ local function EncryptData(Message,key)
 end
 
 local function EncryptTable(MainData)
-	
+
 end
 
 function module.new(Message,EncryptType,key)

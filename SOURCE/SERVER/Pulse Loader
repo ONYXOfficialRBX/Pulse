@@ -140,10 +140,24 @@ local function DecryptMessage(Player,Args,EncodedKey)
 	local Num = math.random(1,100)
 	EncodedSeed = EncodedSeed / Player.AccountAge
 	local Seed = EncodedSeed * Num
-	local r = DecodeMessage(EncodedKey,Seed)
-	print(r)
-	local EncryptedMessage = DecodeMessage(EncodedMessage,Seed)
+	if string.find(Seed,'.9999') then
+		Seed = Seed + .1
+	end
+	Seed = math.floor(Seed)
+	local r = AES_Server:DecodeMessage(EncodedKey,Seed)
+	if not tonumber(r) then
+		r = AES_Server:DecodeMessage(EncodedKey, Seed + 1)
+	end
+	if not tonumber(r) then
+		r = AES_Server:DecodeMessage(EncodedKey,Seed - 1)
+	end
+	if not tonumber(r) then
+		Args[2] = Args[2] + .1
+		return DecryptMessage(Player,Args,EncodedKey)
+	end
+	local EncryptedMessage = AES_Server:DecodeMessage(EncodedMessage,Seed)
 	local DecryptedMessage = AES_Server.new(EncryptedMessage,'Decrypt',r)
+
 	return DecryptedMessage
 end
 local a = false
