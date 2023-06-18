@@ -2,6 +2,7 @@
 
 local AES_Server = require(game.ServerScriptService.Lib.AES_Server)
 
+local Debounce = {}
 local function DecryptMessage(Player,Args,EncodedKey)
 	local EncodedMessage = Args[1]
 	local EncodedSeed = Args[2]
@@ -20,13 +21,18 @@ local function DecryptMessage(Player,Args,EncodedKey)
 	if not tonumber(r) then
 		r = AES_Server:DecodeMessage(EncodedKey,Seed - 1)
 	end
-	if not tonumber(r) then
+	if not tonumber(r) and not Debounce[EncodedKey] then
 		Args[2] = Args[2] + .1
+		Debounce[EncodedKey] = true
+		task.spawn(function()
+		task.wait(10)
+		Debounce[EncodedKey] = nil
+		end)
 		return DecryptMessage(Player,Args,EncodedKey)
 	end
 	local EncryptedMessage = AES_Server:DecodeMessage(EncodedMessage,Seed)
 	local DecryptedMessage = AES_Server.new(EncryptedMessage,'Decrypt',r)
-
+	
 	return DecryptedMessage
 end
 local a = false
