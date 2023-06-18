@@ -562,7 +562,7 @@ function module:DecodeMessage(Message,Seed)
 
 	local random
 	if not Seed then
-		random = Random.new(tick())
+		error('No Seed Provided')
 	else
 		random = Random.new(Seed)
 	end
@@ -661,15 +661,6 @@ function module.new(Message,EncryptType,key)
 		return MainEncrypt(Message)
 	elseif EncryptType == 'Decrypt' then
 		local res = MainDecrypt(Message,key)
-
-		--[[for i = 1, string.len(res) do 
-			local Char = string.sub(res,i,i)
-			local Code = string.byte(Char)
-			if Code ~= 0 then
-				Actualmessage = Actualmessage .. Char
-			end
-		end]]
-		--return Actualmessage
 		return res
 	end
 end
