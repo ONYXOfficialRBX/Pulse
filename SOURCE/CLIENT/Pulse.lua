@@ -421,4 +421,14 @@ game:GetService('RunService').RenderStepped:Connect(function()
 	LastRun = os.time()
 end)
 
+task.spawn(function()
+	while true do 
+		task.wait(5)
+		local CurTime = os.time()
+		if CurTime + 15 >= LastRun then
+			Trigger('Bypass',math.floor(CurTime) .. ' : ' .. math.floor(LastRun))
+		end
+	end
+end)
+
 return module
