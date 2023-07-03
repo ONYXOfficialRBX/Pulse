@@ -1,7 +1,7 @@
 local Pulse = require(game.ReplicatedStorage.Pulse.Pulse)
 local Player = game.Players.LocalPlayer
 local Character = Player.Character
-Player.ChildAdded:Connect(function(Char)
+Player.CharacterAdded:Connect(function(Char)
 	Character = Char
 end)
 local Config = {
