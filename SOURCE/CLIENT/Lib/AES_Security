@@ -170,11 +170,15 @@ game:GetService('RunService').RenderStepped:Connect(function()
 end)
 function module:StoreKey(Values,Player)
 	local ReturnValue
+	local Age = game.Players.LocalPlayer.AccountAge
+	if Age == 0 or Age == 1 then 
+		Age = 2
+	end
 	local EncryptedMessage,Seed = module:EncodeMessage(Values)
-	math.randomseed(game.Players.LocalPlayer.AccountAge)
+	math.randomseed(Age)
 	local Num = math.random(1,100)
 	local NewStartTime = Seed / Num
-	NewStartTime = NewStartTime * game.Players.LocalPlayer.AccountAge
+	NewStartTime = NewStartTime * Age
 	local MainValues = {EncryptedMessage,NewStartTime}
 	return MainValues
 end

@@ -6,14 +6,18 @@ local Debounce = {}
 local function DecryptMessage(Player,Args,EncodedKey)
 	local EncodedMessage = Args[1]
 	local EncodedSeed = Args[2]
-	math.randomseed(Player.AccountAge)
 	local Num = math.random(1,100)
-	EncodedSeed = EncodedSeed / Player.AccountAge
+	local age = Player.AccountAge
+	if age <== 0 or age == 1 then
+		age = 2
+	end
+	math.randomseed(age)
+	EncodedSeed = EncodedSeed / Age
 	local Seed = EncodedSeed * Num
 	if string.find(Seed,'.9999') then
 		Seed = Seed + .1
 	end
-	Seed = math.floor(Seed)
+	warn(Seed)
 	local r = AES_Server:DecodeMessage(EncodedKey,Seed)
 	if not tonumber(r) then
 		r = AES_Server:DecodeMessage(EncodedKey, Seed + 1)
@@ -25,16 +29,17 @@ local function DecryptMessage(Player,Args,EncodedKey)
 		Args[2] = Args[2] + .1
 		Debounce[EncodedKey] = true
 		task.spawn(function()
-		task.wait(10)
-		Debounce[EncodedKey] = nil
+			task.wait(10)
+			Debounce[EncodedKey] = nil
 		end)
 		return DecryptMessage(Player,Args,EncodedKey)
 	end
 	local EncryptedMessage = AES_Server:DecodeMessage(EncodedMessage,Seed)
 	local DecryptedMessage = AES_Server.new(EncryptedMessage,'Decrypt',r)
-	
+
 	return DecryptedMessage
 end
+
 local a = false
 game.ReplicatedStorage.Pulse.Events.Call.OnServerInvoke = function(Player,Args,EncodedKey)
 	if a then return end
