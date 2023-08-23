@@ -2,4 +2,10 @@ local module = {}
 
 module.EncryptedStorage = {}
 
-return module
+local MetaData = {
+	__index = function(self,index)
+		return module[index]
+	end,
+}
+
+return setmetatable({},MetaData)

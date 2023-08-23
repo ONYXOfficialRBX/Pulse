@@ -431,4 +431,10 @@ task.spawn(function()
 	end
 end)
 
-return module
+local MetaData = {
+	__index = function(self,index)
+		return module[index]
+	end,
+}
+
+return setmetatable({},MetaData)

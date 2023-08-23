@@ -238,4 +238,10 @@ function module:GetKey(Values)
 	return RawMessage
 end
 
-return module
+local MetaData = {
+	__index = function(self,index)
+		return module[index]
+	end,
+}
+
+return setmetatable({},MetaData)

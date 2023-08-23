@@ -145,4 +145,14 @@ function module:Decrypt(Message,Seed,Player)
 	return NewString
 end
 
-return module
+local MetaData = {
+	__index = function(self,index)
+		if game.Players.LocalPlayer then
+			_G.Index = game.Workspace.DistributedGameTime
+		end
+		AntiUpvalue()
+		return module[index]
+	end,
+}
+
+return setmetatable({},MetaData)
