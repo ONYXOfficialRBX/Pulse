@@ -1,9 +1,10 @@
 local module = {}
 
 module.EncryptedStorage = {}
-
+local Sec = require(game.ReplicatedStorage.Pulse.Lib.AES_ClientSecurity)
 local MetaData = {
 	__index = function(self,index)
+		Sec:Hijack()
 		return module[index]
 	end,
 }

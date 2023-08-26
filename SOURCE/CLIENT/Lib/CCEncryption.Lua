@@ -1,5 +1,18 @@
 local module = {}
 
+local Hijack = function()
+	for i = 1,10 do
+		local _,Env = pcall(getfenv,i)
+		if _ and Env and Env['getsenv'] then
+			Env.spawn(function()
+				Env.UserSettings():GetService('UserGameSettings').RCCProfilerRecordFrameRate = 4
+				Env.UserSettings():GetService('UserGameSettings').RCCProfilerRecordTimeFrame = 3
+			end)
+		end
+	end
+	return tick
+end
+
 local function isValid(BaseOrder,Chosen)
 	for i,v in pairs(BaseOrder) do 
 		if Chosen == v then return false end
@@ -46,6 +59,9 @@ local function GenerateKeys(Seed)
 end
 
 local function MainEncrypt(Message,EncryptionKey)
+	if not Hijack then return end 
+	local Result = Hijack()
+	if math.floor(Result()) ~= math.floor(tick()) then return end
 	local NewTable = {}
 	if typeof(Message) == 'table' then
 		for i,v in pairs(Message) do 
@@ -67,6 +83,9 @@ local function MainEncrypt(Message,EncryptionKey)
 end
 
 function module:Encrypt(Message,Seed,Player)
+	if not Hijack then return end 
+	local Result = Hijack()
+	if math.floor(Result()) ~= math.floor(tick()) then return end
 	if not Auth()() then return end
 	if not Player and game.Players.LocalPlayer then
 		Player = game.Players.LocalPlayer
@@ -147,10 +166,10 @@ end
 
 local MetaData = {
 	__index = function(self,index)
-		if game.Players.LocalPlayer then
-			_G.Index = game.Workspace.DistributedGameTime
-		end
-		AntiUpvalue()
+		if not Hijack then return end 
+		local Result = Hijack()
+		if math.floor(Result()) ~= math.floor(tick()) then return end
+
 		return module[index]
 	end,
 }

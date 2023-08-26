@@ -1,5 +1,5 @@
 local module = {}
-
+local Sec = require(game.ReplicatedStorage.Pulse.Lib.AES_Security)
 local GF8x2 = {
 	[0]=0x00,0x02,0x04,0x06,0x08,0x0a,0x0c,0x0e,0x10,0x12,0x14,0x16,0x18,0x1a,0x1c,0x1e,
 	0x20,0x22,0x24,0x26,0x28,0x2a,0x2c,0x2e,0x30,0x32,0x34,0x36,0x38,0x3a,0x3c,0x3e,
@@ -365,14 +365,13 @@ local function ConvertAESKeyFromString(keyString)
 	return table.concat(key, " ")
 end
 
+
 -- Generate a 256-bit AES key
-local aesKey = Generate256BitAESKey()
 local DecryptionKeys = {}
-local key = 0x68C756C6C186436C9EC51C174C32AE81761389B5E5904E30BA57CCD911290ECC
 
 local function MainEncrypt(ToBeEncrypted,key)
 	if not key then
-		local NewKey = Generate256BitAESKey()
+		local NewKey = Sec:GenerateKey()
 		key = NewKey
 	end
 	if typeof(ToBeEncrypted) == 'number' or typeof(ToBeEncrypted) == 'string' then
@@ -398,45 +397,22 @@ local function MainEncrypt(ToBeEncrypted,key)
 		return NewTable
 	end
 end
-local Sec = require(game.ReplicatedStorage.Pulse.Lib.AES_Security)
 
-local function EncryptData(Message,key)
-	if typeof(Message) ~= 'table' then return Message end
-	if typeof(Message) == 'table' then
-		local newTable = {}
-		for i,v in pairs(Message) do 
-			local newIndex 
-			local newValue
-			if typeof(i) ~= 'table' then
-				newIndex = ECB_256(encrypt,key,tostring(i))
-			else
-				i = EncryptData(i,key)
-				newIndex = i 
-			end
-			if typeof(v) ~= 'table' then
-				newValue = ECB_256(encrypt,key,tostring(v))
-			else
-				v = EncryptData(v,key)
-				newValue = v
-			end
-			newTable[newIndex] = newValue
-		end
-		return newTable
-	end
-end
 
 local function EncryptTable(MainData)
 
 end
-
+local Http = game:GetService('HttpService')
 function module.new(Message,EncryptType,key)
 	--if not Sec:Auth()() then warn('fail') return end
 	if not key then
-		key = Generate256BitAESKey()
+		key = Sec:GenerateKey()
 	end
-	Message = EncryptData(Message,key)
+	Message = MainEncrypt(Message,key)
 	if EncryptType == 'Encrypt' then
-		return Sec:StoreKey(Message),key
+		local Token = Http:GenerateGUID(false)
+		Sec:StoreKey(Token,Message)
+		return Token
 	elseif EncryptType == 'Decrypt' then
 		return nil
 	end

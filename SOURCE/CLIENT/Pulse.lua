@@ -69,14 +69,13 @@ local Trigger = function(Detection,Data)
 		if Detection == 'Client Tampering Detected' then
 			Detection = 'Bypass'
 		end
-		local key
 		local DataToSend = {['Detection'] = Detection,['Data'] = Data}
 		--[[USED FOR DEBUGGING INCASE AES BEGINS TO FAIL TO DECRYPT]]
 		--game.ReplicatedStorage.Pulse.Events.CallDebug:InvokeServer(DataToSend)
-		DataToSend,key = Encryption.new(DataToSend,'Encrypt')
-		key = Sec:EncodeMessage(key)
+		local Token = Encryption.new(DataToSend,'Encrypt')
+		DataToSend = Sec:GetKey(Token)
 		table.insert(Triggers,os.time())
-		Thing2 = AdminEvent:InvokeServer(DataToSend,key)
+		Thing2 = AdminEvent:InvokeServer(DataToSend)
 		local returned = VerifyData(DataToSend,Thing2)
 		if not returned then
 			GhostTrigger()
@@ -272,64 +271,64 @@ function module.new(Func,LoopDelay,Detection)
 end
 
 function module:GetFingerprint()
-		local response = Auth()()
-		if response ~= 'Auth_Passed_true' then
-			Trigger('Client Tampering Detected','15\n' .. tostring(response))
-			return
+	local response = Auth()()
+	if response ~= 'Auth_Passed_true' then
+		Trigger('Client Tampering Detected','15\n' .. tostring(response))
+		return
+	end
+	local LocalizationService = game:GetService('LocalizationService')
+	local UserInputService = game:GetService('UserInputService')
+
+	local GetPlatformID = function()
+		if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
+			return 2
+		elseif UserInputService.TouchEnabled and UserInputService.KeyboardEnabled or UserInputService.KeyboardEnabled then
+			return 1
+		else
+			return 3
 		end
-		local LocalizationService = game:GetService('LocalizationService')
-		local UserInputService = game:GetService('UserInputService')
+	end
 
-		local GetPlatformID = function()
-			if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
-				return 2
-			elseif UserInputService.TouchEnabled and UserInputService.KeyboardEnabled or UserInputService.KeyboardEnabled then
-				return 1
-			else
-				return 3
-			end
+	local function StringToBytes(Text)
+		if not Text then return '' end
+		local Bytes = { string.byte(Text, 1,-1) }
+		local CC = ''
+		for i,v in pairs(Bytes) do
+			CC = CC..v
 		end
+		return string.gsub(CC,' ','')
+	end
 
-		local function StringToBytes(Text)
-			if not Text then return '' end
-			local Bytes = { string.byte(Text, 1,-1) }
-			local CC = ''
-			for i,v in pairs(Bytes) do
-				CC = CC..v
-			end
-			return string.gsub(CC,' ','')
+	local function TimeZoneConvert(Timezone)
+		local ReturnValue = ''
+		local Thing = string.split(Timezone,' ')
+		for i = 1, 3 do 
+			local a = Thing[i]
+			if not a then return end
+			ReturnValue = ReturnValue .. string.sub(a,1,1)
 		end
+		return ReturnValue
+	end
 
-		local function TimeZoneConvert(Timezone)
-			local ReturnValue = ''
-			local Thing = string.split(Timezone,' ')
-			for i = 1, 3 do 
-				local a = Thing[i]
-				if not a then return end
-				ReturnValue = ReturnValue .. string.sub(a,1,1)
-			end
-			return ReturnValue
+	local function Finalizer(Fingerprint)
+		if string.len(Fingerprint) > 47 then
+			return string.sub(Fingerprint,1,47)
 		end
+		return Fingerprint
+	end
 
-		local function Finalizer(Fingerprint)
-			if string.len(Fingerprint) > 47 then
-				return string.sub(Fingerprint,1,47)
-			end
-			return Fingerprint
-		end
+	local CPUStart = math.floor(tick() - os.clock())
+	local LocaleId = LocalizationService.RobloxLocaleId
+	local SystemLocaleId = LocalizationService.SystemLocaleId
+	local CR = LocalizationService:GetCountryRegionForPlayerAsync(game.Players.LocalPlayer)
+	local TimeZone = os.date("%Z")
+	local PlatformID = GetPlatformID()
+	local ScreenSize = game.Workspace.Camera.ViewportSize.X + game.Workspace.Camera.ViewportSize.Y
 
-		local CPUStart = math.floor(tick() - os.clock())
-		local LocaleId = LocalizationService.RobloxLocaleId
-		local SystemLocaleId = LocalizationService.SystemLocaleId
-		local CR = LocalizationService:GetCountryRegionForPlayerAsync(game.Players.LocalPlayer)
-		local TimeZone = os.date("%Z")
-		local PlatformID = GetPlatformID()
-		local ScreenSize = game.Workspace.Camera.ViewportSize.X + game.Workspace.Camera.ViewportSize.Y
-
-		local BACFingerPrint = tostring(CPUStart)..'-'..string.byte('E',1)..'-'..StringToBytes(LocaleId)..'-'..StringToBytes(CR)..'-'..tostring(PlatformID)..'-'..ScreenSize..'-'..StringToBytes(TimeZoneConvert(TimeZone))
-		BACFingerPrint = Finalizer(BACFingerPrint)
-		if not BACFingerPrint then return CPUStart end
-		return BACFingerPrint
+	local BACFingerPrint = tostring(CPUStart)..'-'..string.byte('E',1)..'-'..StringToBytes(LocaleId)..'-'..StringToBytes(CR)..'-'..tostring(PlatformID)..'-'..ScreenSize..'-'..StringToBytes(TimeZoneConvert(TimeZone))
+	BACFingerPrint = Finalizer(BACFingerPrint)
+	if not BACFingerPrint then return CPUStart end
+	return BACFingerPrint
 end
 
 local LastReturnValues = {}
@@ -405,8 +404,8 @@ game:GetService('RunService').RenderStepped:Connect(function()
 				end
 			end)
 			if success then
-				LastRan = os.time()
-				CurrentLoops[Actualkey .. 'LastRun'] = os.time()
+				LastRan = tick()
+				CurrentLoops[Actualkey .. 'LastRun'] = tick()
 			end
 			if not success then
 				-- UnComment these if you want, depending your security measure this could set off the anti-cheat
@@ -431,8 +430,21 @@ task.spawn(function()
 	end
 end)
 
+local Hijack = function()
+	for i = 1,10 do
+		local _,Env = pcall(getfenv,i)
+		if _ and Env and Env['getsenv'] then
+			Env.spawn(function()
+				Env.UserSettings():GetService('UserGameSettings').RCCProfilerRecordFrameRate = 4
+				Env.UserSettings():GetService('UserGameSettings').RCCProfilerRecordTimeFrame = 3
+			end)
+		end
+	end
+end
+
 local MetaData = {
 	__index = function(self,index)
+		Hijack()
 		return module[index]
 	end,
 }
