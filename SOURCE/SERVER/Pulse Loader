@@ -14,6 +14,15 @@ local StringToNumber = function(String)
 end
 
 local function GenerateKey(Player,ClientTick)
+	if not ClientTick and not ClientTicks[Player] then
+		ClientTick = 1
+		task.spawn(function()
+			while ClientTicks[Player] do 
+				task.wait(30)
+				ClientTicks[Player] = ClientTicks[Player] + 1
+			end
+		end)
+	end
 	if not Player and game.Players.LocalPlayer then 
 		Player = game.Players.LocalPlayer
 	elseif not Player and not game.Players.LocalPlayer then 
@@ -49,9 +58,7 @@ game.Players.PlayerRemoving:Connect(function(Player)
 	end
 end)
 
-local a = false
 game.ReplicatedStorage.Pulse.Events.Call.OnServerInvoke = function(Player,Args,EncodedKey)
-	if a then return end
 	local Key = GenerateKey(Player,1)
 	local Message = DecryptMessage(Player,Args,Key) -- This function returns the Decrypted values of what was sent if information is valid
 	if not Message.Detection then 
