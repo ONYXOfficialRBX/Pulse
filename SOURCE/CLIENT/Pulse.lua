@@ -3,8 +3,8 @@ local module = {}
 local CurrentLoops = {}
 local MainTraces = {}
 local MaxTraces = math.huge
-local Triggers = {}
 local AdminEvent = nil
+local Triggers = {}
 local ExploitsDetected = false
 local LastRan = nil
 local UseEncryption = true
@@ -55,12 +55,6 @@ end
 AdminEvent = game.ReplicatedStorage.Pulse.Events.Call
 local Sec = require(game.ReplicatedStorage.Pulse.Lib.AES_Security)
 local Trigger = function(Detection,Data)
-	if Cooldowns[Detection] then return end
-	Cooldowns[Detection] = true
-	spawn(function()
-		task.wait(5)
-		Cooldowns[Detection] = nil
-	end)
 	if Detection == 'Client Tampering Detected' then
 	end
 	local Thing2 = nil
@@ -74,11 +68,11 @@ local Trigger = function(Detection,Data)
 		--game.ReplicatedStorage.Pulse.Events.CallDebug:InvokeServer(DataToSend)
 		local Token = Encryption.new(DataToSend,'Encrypt')
 		DataToSend = Sec:GetKey(Token)
-		table.insert(Triggers,os.time())
+		Triggers[Detection] = tick()
 		Thing2 = AdminEvent:InvokeServer(DataToSend)
 		local returned = VerifyData(DataToSend,Thing2)
 		if not returned then
-			GhostTrigger()
+			--GhostTrigger()
 		end
 		if typeof(Data) ~= 'table' then return Thing2 end
 		local DataIndexes = 0
@@ -206,7 +200,7 @@ local Auth = function()
 			Trigger('Client Tampering detected','10\n' .. callingScriptPath)
 			return 'Auth_Failed_false'
 		end
-		LastRan = os.time()
+		LastRan = tick()
 		return 'Auth_Passed_true'
 	end
 	return ActualAuth
@@ -218,28 +212,7 @@ function module:SetId(Id)
 	Auth()()
 	AnimationId = Id
 end
-spawn(function()
-	repeat task.wait() until AdminEvent
-	AdminEvent.OnClientInvoke = function(VerifyData)
-		if Triggers[VerifyData] then
-			Triggers[VerifyData] = nil
-		else
-			Trigger('Remote Tampering Detected','12\n' .. VerifyData)
-		end
-	end
-end)
-local Response = function(Data)
-	local Fired = false
-	for i,v in pairs(Triggers) do 
-		if v == Data then
-			Fired = true
-		end
-	end
-	if Fired then return end
-	if not Fired then
-		Trigger('Remote Tampering detected','13\nNot Fired')
-	end
-end
+
 
 
 local LastRuns = {}
@@ -324,7 +297,8 @@ function module:GetFingerprint()
 	local TimeZone = os.date("%Z")
 	local PlatformID = GetPlatformID()
 	local ScreenSize = game.Workspace.Camera.ViewportSize.X + game.Workspace.Camera.ViewportSize.Y
-
+	print(LocaleId)
+	print(PlatformID)
 	local BACFingerPrint = tostring(CPUStart)..'-'..string.byte('E',1)..'-'..StringToBytes(LocaleId)..'-'..StringToBytes(CR)..'-'..tostring(PlatformID)..'-'..ScreenSize..'-'..StringToBytes(TimeZoneConvert(TimeZone))
 	BACFingerPrint = Finalizer(BACFingerPrint)
 	if not BACFingerPrint then return CPUStart end
@@ -346,7 +320,7 @@ local GetNextFunction = function()
 		if v~= '' then
 			local LastRun = CurrentLoops[v .. 'LastRun']
 			local TheDelay = CurrentLoops[v .. 'Delay']
-			if os.time() > LastRun + TheDelay and not table.find(LastChosenFunction,CurrentLoops[v .. 'Detection']) then
+			if tick() > LastRun + TheDelay and not table.find(LastChosenFunction,CurrentLoops[v .. 'Detection']) then
 				table.insert(PossibleFunc,CurrentLoops[v])
 			end
 		end
@@ -369,7 +343,21 @@ local GetKeyFromFunction = function(Function)
 	end
 end
 
+local IsFrozen = function()
+	if not tonumber(LastRan) then return false end
+	if LastRan + 1 < tick() then
+		return true
+	end
+	return false
+end
+local LastFreeze = nil
 game:GetService('RunService').RenderStepped:Connect(function()
+	if IsFrozen() then
+		LastFreeze = tick()
+		warn('Game Freeze Detected. Game was frozen for about ' .. string.sub(tostring(tick()-LastRun),1,3) .. ' seconds')
+	end
+	
+	LastRan = tick()
 	if not script.Parent then
 		--Trigger('Client Tampering Detected','16')
 	end
@@ -378,18 +366,19 @@ game:GetService('RunService').RenderStepped:Connect(function()
 		local Actualkey = Key
 		local lastRun  = CurrentLoops[Key .. 'LastRun']
 		local TheDelay = CurrentLoops[Key .. 'Delay']
+		local Detection = CurrentLoops[Key .. 'Detection']
 		local MainFunction = CurrentLoops[Key]
 		if not lastRun and TheDelay then
 			lastRun = 0
 		end
-		if MainFunction and lastRun and TheDelay and lastRun + TheDelay <= os.time() then
+		if MainFunction and lastRun and TheDelay and lastRun + TheDelay <= tick() then
 			if Actualkey == '' or Actualkey == ' ' then return end
 			if not Key then return end
 			if not CurrentLoops[Actualkey] and Actualkey ~= '' then
 				Trigger('Client Tampering Detected','17\n' .. 'function Removed.')
 			end
 			local success,err = nil
-			CurrentLoops[Actualkey .. 'LastRun'] = os.time()
+			CurrentLoops[Actualkey .. 'LastRun'] = tick()
 			success,err = pcall(function()
 				local Result,ExtraData = MainFunction()
 				if not LastReturnValues[Actualkey] and Result ~= 'check_failed' then
@@ -399,12 +388,11 @@ game:GetService('RunService').RenderStepped:Connect(function()
 						Trigger('Client Tampering Detected','18\n' .. 'Expected: ' .. tostring(LastReturnValues[Actualkey]) .. ' Got: ' .. tostring(Result) .. '\nDetection: ' .. CurrentLoops[Actualkey .. 'Detection'])
 					end
 				end
-				if Result == 'check_failed' then
+				if Result == 'check_failed' and ( not Triggers[Detection] or Triggers[Detection] + lastRun >= tick()) then
 					Trigger(CurrentLoops[Actualkey .. 'Detection'],ExtraData)
 				end
 			end)
 			if success then
-				LastRan = tick()
 				CurrentLoops[Actualkey .. 'LastRun'] = tick()
 			end
 			if not success then
@@ -412,21 +400,23 @@ game:GetService('RunService').RenderStepped:Connect(function()
 				--warn(err)
 				--warn(CurrentLoops[tostring(Actualkey) .. 'Detection'] .. ' ran into a problem while executing, Data: ' .. tostring(err))
 			end
-			if Actualkey ~= '' and LastRan + TheDelay + 10 < TheDelay + os.time() then
+			if Actualkey ~= '' and LastRan + TheDelay + 10 < TheDelay + tick() then
+				if LastFreeze and tick() - LastFreeze <= 1 then return end
 				Trigger('Client Tampering Detected','20\n function execution ceased' )
 			end
 		end
 	end
-	LastRun = os.time()
+	LastRun = tick()
 end)
 
 task.spawn(function()
 	while true do 
-		task.wait(5)
-		local CurTime = os.time()
-		if CurTime + 15 >= LastRun then
+		task.wait(2.5)
+		local CurTime = tick()
+		if CurTime + 15 <= LastRun then
 			Trigger('Bypass',math.floor(CurTime) .. ' : ' .. math.floor(LastRun))
 		end
+		task.wait(2.5)
 	end
 end)
 

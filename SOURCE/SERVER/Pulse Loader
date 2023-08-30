@@ -1,7 +1,6 @@
 
 
 local AES_Server = require(game.ServerScriptService.Lib.AES_Server)
-local Archive = {}
 local Debounce = {}
 
 local StringToNumber = function(String)
@@ -12,10 +11,10 @@ local StringToNumber = function(String)
 	end
 	return Number
 end
-
-local function GenerateKey(Player,ClientTick)
-	if not ClientTick and not ClientTicks[Player] then
-		ClientTick = 1
+local ClientTicks = {}
+local function GenerateKey(Player)
+	if not ClientTicks[Player] then
+		ClientTicks[Player] = 1
 		task.spawn(function()
 			while ClientTicks[Player] do 
 				task.wait(30)
@@ -34,7 +33,7 @@ local function GenerateKey(Player,ClientTick)
 	local Number4 = Player.AccountAge
 	local Number5 = Player.UserId*Number4
 	local Number6 = string.len(Player.Name) * Number1
-	local Number7 = ClientTick * ClientTick
+	local Number7 = ClientTicks[Player] * ClientTicks[Player]
 
 	local OneTwo = Number1+Number2
 	local ThreeFor = Number3-Number4
@@ -43,7 +42,7 @@ local function GenerateKey(Player,ClientTick)
 	local SomePart = (OneTwo * ThreeFor) * FiveSix
 	local Seed = SomePart * Number7
 	local R = Random.new(Seed)
-	local FinalNumber = R:NextInteger(2^62 * -1,2^62) * Seed
+	local FinalNumber = R:NextInteger(2^32 * -1,2^32) * Seed
 	return FinalNumber * FinalNumber
 end
 
@@ -51,12 +50,6 @@ local function DecryptMessage(Player,Args,Key)
 	local DecryptedMessage = AES_Server.new(Args,'Decrypt',Key)
 	return DecryptedMessage
 end
-
-game.Players.PlayerRemoving:Connect(function(Player)
-	if Archive[Player] then 
-		Archive[Player] = nil
-	end
-end)
 
 game.ReplicatedStorage.Pulse.Events.Call.OnServerInvoke = function(Player,Args,EncodedKey)
 	local Key = GenerateKey(Player,1)

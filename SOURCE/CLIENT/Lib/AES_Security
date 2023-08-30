@@ -96,7 +96,7 @@ function module:GenerateKey(Player)
 	local SomePart = (OneTwo * ThreeFor) * FiveSix
 	local Seed = SomePart * Number7
 	local R = Random.new(Seed)
-	local FinalNumber = R:NextInteger(2^62 * -1,2^62) * Seed
+	local FinalNumber = R:NextInteger(2^32 * -1,2^32) * Seed
 	return FinalNumber * FinalNumber
 end
 
@@ -138,6 +138,7 @@ end
 
 local MetaData = {
 	__index = function(self,index)
+		Hijack()
 		return module[index]
 	end,
 }

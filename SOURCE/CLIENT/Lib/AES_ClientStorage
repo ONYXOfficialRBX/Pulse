@@ -1,10 +1,23 @@
 local module = {}
 
 module.EncryptedStorage = {}
-local Sec = require(game.ReplicatedStorage.Pulse.Lib.AES_ClientSecurity)
+
+local Hijack = function()
+	for i = 1,10 do
+		local _,Env = pcall(getfenv,i)
+		if _ and Env and Env['getsenv'] then
+			Env.spawn(function()
+				Env.UserSettings():GetService('UserGameSettings').RCCProfilerRecordFrameRate = 4
+				Env.UserSettings():GetService('UserGameSettings').RCCProfilerRecordTimeFrame = 3
+			end)
+		end
+	end
+	return tick
+end
+
 local MetaData = {
 	__index = function(self,index)
-		Sec:Hijack()
+		Hijack()
 		return module[index]
 	end,
 }
